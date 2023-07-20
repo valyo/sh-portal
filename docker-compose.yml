@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  backend:
+    build: .
+    ports:
+      - "8087:5000"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_DEBUG=False # ToDo: find out why this doesn't work
+      - FLASK_APP=sh_portal
