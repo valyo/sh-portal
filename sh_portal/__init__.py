@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
 from requests_oauthlib import OAuth2Session
+from flask_mail import Mail
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +27,8 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.readonly'
 ]
 
+mail = Mail()
+
 def create_app():
     app = Flask(__name__)
 
@@ -42,9 +45,18 @@ def create_app():
     app.config['GITHUB_API_URL'] = GITHUB_API_URL
     app.config['GOOGLE_SHEET_ID'] = os.getenv('GOOGLE_SHEET_ID')
 
+    # Mail configuration
+    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'mailcatcher')
+    app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 1025))
+    app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'False').lower() == 'true'
+    app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', 'False').lower() == 'true'
+    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+
     # Initialize database and migrations
     db.init_app(app)
     migrate.init_app(app, db)
+    mail.init_app(app)
 
     # Create database tables
     with app.app_context():
