@@ -83,32 +83,53 @@
                     <div class="tab-pane fade show active" id="bookings" role="tabpanel" aria-labelledby="bookings-tab">
                         <h3>Bookings for {{ selected_season.year }}</h3>
                         {% if bookings %}
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Email</th>
-                                            <th>Telephone</th>
-                                            <th>Address</th>
-                                            <th>Number</th>
-                                            <th>Message</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for booking in bookings %}
-                                        <tr>
-                                            <td>{{ booking.name }}</td>
-                                            <td>{{ booking.email }}</td>
-                                            <td>{{ booking.telephone }}</td>
-                                            <td>{{ booking.address }}</td>
-                                            <td>{{ booking.number }}</td>
-                                            <td>{{ booking.message }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <form id="bookingsForm" method="POST">
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-primary" id="sendInvoiceBtn" disabled>
+                                        <i class="bi bi-envelope"></i> Send Invoice
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="manageBookingBtn" disabled>
+                                        <i class="bi bi-gear"></i> Manage Booking
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="selectAll">
+                                                    </div>
+                                                </th>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Telephone</th>
+                                                <th>Address</th>
+                                                <th>Number</th>
+                                                <th>Message</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for booking in bookings %}
+                                            <tr>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input booking-checkbox" type="checkbox" 
+                                                               name="selected_bookings[]" value="{{ booking.id }}">
+                                                    </div>
+                                                </td>
+                                                <td>{{ booking.name }}</td>
+                                                <td>{{ booking.email }}</td>
+                                                <td>{{ booking.telephone }}</td>
+                                                <td>{{ booking.address }}</td>
+                                                <td>{{ booking.number }}</td>
+                                                <td>{{ booking.message }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </form>
                         {% else %}
                             <p class="text-muted">No bookings found for this season.</p>
                         {% endif %}
@@ -159,4 +180,57 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const bookingCheckboxes = document.querySelectorAll('.booking-checkbox');
+    const sendInvoiceBtn = document.getElementById('sendInvoiceBtn');
+    const manageBookingBtn = document.getElementById('manageBookingBtn');
+
+    // Function to update action buttons state
+    function updateActionButtons() {
+        const checkedBoxes = document.querySelectorAll('.booking-checkbox:checked');
+        const hasChecked = checkedBoxes.length > 0;
+        sendInvoiceBtn.disabled = !hasChecked;
+        manageBookingBtn.disabled = !hasChecked;
+    }
+
+    // Select all checkbox functionality
+    selectAllCheckbox.addEventListener('change', function() {
+        bookingCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        updateActionButtons();
+    });
+
+    // Individual checkbox functionality
+    bookingCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            // Update "Select All" checkbox state
+            const allChecked = Array.from(bookingCheckboxes).every(cb => cb.checked);
+            const someChecked = Array.from(bookingCheckboxes).some(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked && !allChecked;
+            
+            updateActionButtons();
+        });
+    });
+
+    // Action buttons click handlers
+    sendInvoiceBtn.addEventListener('click', function() {
+        const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
+            .map(cb => cb.value);
+        // TODO: Implement send invoice functionality
+        console.log('Send invoice for bookings:', selectedBookings);
+    });
+
+    manageBookingBtn.addEventListener('click', function() {
+        const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
+            .map(cb => cb.value);
+        // TODO: Implement manage booking functionality
+        console.log('Manage bookings:', selectedBookings);
+    });
+});
+</script>
 {% endblock %} 
