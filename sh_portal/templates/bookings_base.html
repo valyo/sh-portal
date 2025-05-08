@@ -69,9 +69,39 @@
                   </div>
                 </div>
                 <!-- End Modal -->
+                <!-- Display bookings -->
                 <div class="mt-4">
-                    <h3>Overview</h3>
-                    <p>Information for {{ page_title|lower }} for season {{ selected_season.year }} will be shown here.</p>
+                    <h3>Bookings for {{ selected_season.year }}</h3>
+                    {% if bookings %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Telephone</th>
+                                        <th>Address</th>
+                                        <th>Number</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in bookings %}
+                                    <tr>
+                                        <td>{{ booking.name }}</td>
+                                        <td>{{ booking.email }}</td>
+                                        <td>{{ booking.telephone }}</td>
+                                        <td>{{ booking.address }}</td>
+                                        <td>{{ booking.number }}</td>
+                                        <td>{{ booking.message }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No bookings found for this season.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>

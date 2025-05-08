@@ -84,10 +84,7 @@ def index():
         return redirect(url_for('main.home'))
     
     seasons = Season.query.order_by(Season.year.desc()).all()
-    selected_season_id = (
-        request.form.get('season_id') or
-        request.args.get('season_id')
-    )
+    selected_season_id = request.form.get('season_id') or request.args.get('season_id')
     selected_season = None
 
     if selected_season_id:
@@ -95,11 +92,17 @@ def index():
     elif seasons:
         selected_season = seasons[0]
 
+    # Fetch bookings for the selected season
+    bookings = []
+    if selected_season:
+        bookings = Bookings.query.filter_by(season_id=selected_season.id).all()
+
     return render_template(
         'bookings_base.html',
         user=session.get('user'),
         seasons=seasons,
         selected_season=selected_season,
+        bookings=bookings,  # Pass bookings to the template
         page_title="Andelsbiodling",
         import_url=url_for('andelsbiodling.import_bookings')
     )
