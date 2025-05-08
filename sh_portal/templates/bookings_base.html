@@ -103,6 +103,40 @@
                         <p class="text-muted">No bookings found for this season.</p>
                     {% endif %}
                 </div>
+                <!-- Display invoices -->
+                <div class="mt-4">
+                    <h3>Invoices for {{ selected_season.year }}</h3>
+                    {% if invoices %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice ID</th>
+                                        <th>Date Created</th>
+                                        <th>Sent</th>
+                                        <th>Date Paid</th>
+                                        <th>Number</th>
+                                        <th>Total Sum</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for invoice in invoices %}
+                                    <tr>
+                                        <td>{{ invoice.invoice_id }}</td>
+                                        <td>{{ invoice.date_created.strftime('%Y-%m-%d') }}</td>
+                                        <td>{{ 'Yes' if invoice.sent else 'No' }}</td>
+                                        <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
+                                        <td>{{ invoice.number }}</td>
+                                        <td>{{ invoice.tot_sum }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No invoices found for this season.</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% else %}

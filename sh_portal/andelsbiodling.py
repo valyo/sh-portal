@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app
-from .models import Season, Bookings
+from .models import Season, Bookings, Invoice
 from . import db
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
@@ -92,17 +92,20 @@ def index():
     elif seasons:
         selected_season = seasons[0]
 
-    # Fetch bookings for the selected season
+    # Fetch bookings and invoices for the selected season
     bookings = []
+    invoices = []
     if selected_season:
         bookings = Bookings.query.filter_by(season_id=selected_season.id).all()
+        invoices = Invoice.query.filter_by(season_id=selected_season.id).all()
 
     return render_template(
         'bookings_base.html',
         user=session.get('user'),
         seasons=seasons,
         selected_season=selected_season,
-        bookings=bookings,  # Pass bookings to the template
+        bookings=bookings,
+        invoices=invoices,  # Pass invoices to the template
         page_title="Andelsbiodling",
         import_url=url_for('andelsbiodling.import_bookings')
     )
