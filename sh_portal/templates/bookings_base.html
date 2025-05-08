@@ -69,73 +69,84 @@
                   </div>
                 </div>
                 <!-- End Modal -->
-                <!-- Display bookings -->
-                <div class="mt-4">
-                    <h3>Bookings for {{ selected_season.year }}</h3>
-                    {% if bookings %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Telephone</th>
-                                        <th>Address</th>
-                                        <th>Number</th>
-                                        <th>Message</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for booking in bookings %}
-                                    <tr>
-                                        <td>{{ booking.name }}</td>
-                                        <td>{{ booking.email }}</td>
-                                        <td>{{ booking.telephone }}</td>
-                                        <td>{{ booking.address }}</td>
-                                        <td>{{ booking.number }}</td>
-                                        <td>{{ booking.message }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">No bookings found for this season.</p>
-                    {% endif %}
-                </div>
-                <!-- Display invoices -->
-                <div class="mt-4">
-                    <h3>Invoices for {{ selected_season.year }}</h3>
-                    {% if invoices %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Invoice ID</th>
-                                        <th>Date Created</th>
-                                        <th>Sent</th>
-                                        <th>Date Paid</th>
-                                        <th>Number</th>
-                                        <th>Total Sum</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for invoice in invoices %}
-                                    <tr>
-                                        <td>{{ invoice.invoice_id }}</td>
-                                        <td>{{ invoice.date_created.strftime('%Y-%m-%d') }}</td>
-                                        <td>{{ 'Yes' if invoice.sent else 'No' }}</td>
-                                        <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
-                                        <td>{{ invoice.number }}</td>
-                                        <td>{{ invoice.tot_sum }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">No invoices found for this season.</p>
-                    {% endif %}
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mt-4" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookings" type="button" role="tab" aria-controls="bookings" aria-selected="true">Bookings</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab" aria-controls="invoices" aria-selected="false">Invoices</button>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3" id="myTabContent">
+                    <!-- Bookings Tab -->
+                    <div class="tab-pane fade show active" id="bookings" role="tabpanel" aria-labelledby="bookings-tab">
+                        <h3>Bookings for {{ selected_season.year }}</h3>
+                        {% if bookings %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Telephone</th>
+                                            <th>Address</th>
+                                            <th>Number</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for booking in bookings %}
+                                        <tr>
+                                            <td>{{ booking.name }}</td>
+                                            <td>{{ booking.email }}</td>
+                                            <td>{{ booking.telephone }}</td>
+                                            <td>{{ booking.address }}</td>
+                                            <td>{{ booking.number }}</td>
+                                            <td>{{ booking.message }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">No bookings found for this season.</p>
+                        {% endif %}
+                    </div>
+                    <!-- Invoices Tab -->
+                    <div class="tab-pane fade" id="invoices" role="tabpanel" aria-labelledby="invoices-tab">
+                        <h3>Invoices for {{ selected_season.year }}</h3>
+                        {% if invoices %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice ID</th>
+                                            <th>Date Created</th>
+                                            <th>Sent</th>
+                                            <th>Date Paid</th>
+                                            <th>Number</th>
+                                            <th>Total Sum</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for invoice in invoices %}
+                                        <tr>
+                                            <td>{{ invoice.invoice_id }}</td>
+                                            <td>{{ invoice.date_created.strftime('%Y-%m-%d') }}</td>
+                                            <td>{{ 'Yes' if invoice.sent else 'No' }}</td>
+                                            <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
+                                            <td>{{ invoice.number }}</td>
+                                            <td>{{ invoice.tot_sum }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">No invoices found for this season.</p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
