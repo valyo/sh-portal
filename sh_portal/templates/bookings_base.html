@@ -99,7 +99,7 @@
                                                     </div>
                                                 </th>
                                                 <th>Name</th>
-                                                <th>Number</th>
+                                                <th>Quantity</th>
                                                 <th>Status</th>
                                                 <th>Payment</th>
                                                 <th>Actions</th>
@@ -115,7 +115,7 @@
                                                     </div>
                                                 </td>
                                                 <td>{{ booking.name }}</td>
-                                                <td>{{ booking.number }}</td>
+                                                <td>{{ booking.quantity }}</td>
                                                 <td>
                                                     {% if booking.id in invoices %}
                                                         <span class="badge bg-success">Invoiced</span>
@@ -162,7 +162,7 @@
                                             <th>Date Created</th>
                                             <th>Sent</th>
                                             <th>Date Paid</th>
-                                            <th>Number</th>
+                                            <th>Quantity</th>
                                             <th>Total Sum</th>
                                         </tr>
                                     </thead>
@@ -173,7 +173,7 @@
                                             <td>{{ invoice.date_created.strftime('%Y-%m-%d') }}</td>
                                             <td>{{ 'Yes' if invoice.sent else 'No' }}</td>
                                             <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
-                                            <td>{{ invoice.number }}</td>
+                                            <td>{{ invoice.booking.quantity }}</td>
                                             <td>{{ invoice.tot_sum }}</td>
                                         </tr>
                                         {% endfor %}
@@ -224,8 +224,8 @@
                             <input type="tel" class="form-control" id="telephone" name="telephone" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="number" class="form-label">Number</label>
-                            <input type="number" class="form-control" id="number" name="number" required>
+                            <label for="quantity" class="form-label">Quantity</label>
+                            <input type="number" class="form-control" id="quantity" name="quantity" required>
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -300,17 +300,25 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Get the selected season ID
+        const seasonId = document.getElementById('season_id').value;
+        if (!seasonId) {
+            alert('Please select a season');
+            return;
+        }
+
         // Show loading state
         sendInvoiceBtn.disabled = true;
         sendInvoiceBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
 
-        fetch('/api/send-invoices', {
+        fetch('/lammandel/api/send-invoices', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                booking_ids: selectedBookings
+                booking_ids: selectedBookings,
+                season_id: seasonId
             })
         })
         .then(response => response.json())
@@ -343,10 +351,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Populate form with booking data
             document.getElementById('bookingId').value = bookingId;
             document.getElementById('name').value = row.cells[1].textContent;
-            document.getElementById('number').value = row.cells[2].textContent;
+            document.getElementById('quantity').value = row.cells[2].textContent;
 
             // Fetch full booking details
-            fetch(`/api/booking/${bookingId}`)
+            fetch(`/lammandel/api/booking/${bookingId}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('email').value = data.email;
@@ -372,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(this);
         const bookingId = formData.get('booking_id');
 
-        fetch(`/api/booking/${bookingId}`, {
+        fetch(`/lammandel/api/booking/${bookingId}`, {
             method: 'POST',
             body: formData
         })

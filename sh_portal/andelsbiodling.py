@@ -185,8 +185,8 @@ def send_invoices():
                 invoice_id=invoice_id,
                 date_created=datetime.now(),
                 sent=True,
-                number=booking.id,  # Using booking ID as invoice number
-                tot_sum=season.price * booking.number
+                quantity=booking.quantity,  # Changed from number to quantity
+                tot_sum=season.price * booking.quantity
             )
             db.session.add(invoice)
 

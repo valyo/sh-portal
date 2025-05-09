@@ -35,7 +35,7 @@ class Bookings(db.Model):
     postnummer = db.Column(db.String(10), nullable=False)
     ort = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text)
-    number = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
 
     # Relationship with Season
     season = db.relationship('Season', backref=db.backref('bookings', lazy=True))
@@ -57,7 +57,7 @@ class BookingsLamm(db.Model):
     postnummer = db.Column(db.String(10), nullable=False)
     ort = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text)
-    number = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
 
     # Relationship with Season
     season = db.relationship('Season', backref=db.backref('bookings_lamm', lazy=True))
@@ -76,7 +76,7 @@ class Invoice(db.Model):
     date_created = db.Column(db.DateTime, default=db.func.current_timestamp())
     sent = db.Column(db.Boolean, default=False)
     date_payed = db.Column(db.DateTime, nullable=True)
-    number = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
 
     # Relationships
@@ -97,7 +97,7 @@ class InvoiceLamm(db.Model):
     date_created = db.Column(db.DateTime, default=db.func.current_timestamp())
     sent = db.Column(db.Boolean, default=False)
     date_payed = db.Column(db.DateTime, nullable=True)
-    number = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
 
     # Relationships
