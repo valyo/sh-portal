@@ -8,6 +8,7 @@ import pandas as pd
 from datetime import datetime
 import re
 from .utils import import_bookings_from_sheet
+from flask_mail import Message
 
 andelsbiodling = Blueprint('andelsbiodling', __name__)
 
@@ -150,3 +151,29 @@ def update_booking(booking_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
+
+@andelsbiodling.route('/api/send-invoices', methods=['POST'])
+def send_invoices():
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    booking_ids = request.json.get('booking_ids', [])
+    if not booking_ids:
+        return jsonify({'error': 'No bookings selected'}), 400
+    
+    bookings = Bookings.query.filter(Bookings.id.in_(booking_ids)).all()
+    
+    try:
+        for booking in bookings:
+            msg = Message(
+                'Your Invoice',
+                sender='noreply@example.com',
+                recipients=[booking.email]
+            )
+            msg.body = f"Here's your invoice"
+            current_app.extensions['mail'].send(msg)
+        
+        return jsonify({'success': True, 'message': f'Invoices sent to {len(bookings)} recipients'})
+    except Exception as e:
+        current_app.logger.error(f"Error sending invoices: {str(e)}")
+        return jsonify({'error': str(e)}), 500

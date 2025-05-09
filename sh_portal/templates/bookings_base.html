@@ -292,8 +292,46 @@ document.addEventListener('DOMContentLoaded', function() {
     sendInvoiceBtn.addEventListener('click', function() {
         const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
             .map(cb => cb.value);
-        // TODO: Implement send invoice functionality
-        console.log('Send invoice for bookings:', selectedBookings);
+        
+        if (selectedBookings.length === 0) {
+            alert('Please select at least one booking');
+            return;
+        }
+
+        // Show loading state
+        sendInvoiceBtn.disabled = true;
+        sendInvoiceBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+
+        fetch('/api/send-invoices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                booking_ids: selectedBookings
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                // Uncheck all checkboxes
+                document.querySelectorAll('.booking-checkbox:checked').forEach(cb => cb.checked = false);
+                selectAllCheckbox.checked = false;
+                updateActionButtons();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to send invoices'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error sending invoices');
+        })
+        .finally(() => {
+            // Reset button state
+            sendInvoiceBtn.disabled = false;
+            sendInvoiceBtn.innerHTML = '<i class="bi bi-envelope"></i> Send Invoice';
+        });
     });
 
     // Individual manage booking buttons
