@@ -124,10 +124,12 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    {% if booking.id in invoices and invoices[booking.id].date_payed %}
-                                                        <span class="badge bg-success">Paid</span>
-                                                    {% elif booking.id in invoices %}
-                                                        <span class="badge bg-warning">Unpaid</span>
+                                                    {% if booking.id in invoices %}
+                                                        {% if invoices[booking.id].date_payed %}
+                                                            <span class="badge bg-success">Paid</span>
+                                                        {% else %}
+                                                            <span class="badge bg-warning">Unpaid</span>
+                                                        {% endif %}
                                                     {% else %}
                                                         <span class="badge bg-secondary">N/A</span>
                                                     {% endif %}
@@ -165,7 +167,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for invoice in invoices %}
+                                        {% for invoice in invoices.values() %}
                                         <tr>
                                             <td>{{ invoice.invoice_id }}</td>
                                             <td>{{ invoice.date_created.strftime('%Y-%m-%d') }}</td>
@@ -315,10 +317,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 alert(data.message);
-                // Uncheck all checkboxes
-                document.querySelectorAll('.booking-checkbox:checked').forEach(cb => cb.checked = false);
-                selectAllCheckbox.checked = false;
-                updateActionButtons();
+                // Reload the page to show updated statuses
+                window.location.reload();
             } else {
                 alert('Error: ' + (data.error || 'Failed to send invoices'));
             }

@@ -95,10 +95,11 @@ def index():
 
     # Fetch bookings and invoices for the selected season
     bookings = []
-    invoices = []
+    invoices = {}
     if selected_season:
         bookings = Bookings.query.filter_by(season_id=selected_season.id).all()
-        invoices = Invoice.query.filter_by(season_id=selected_season.id).all()
+        # Create a dictionary of invoices by booking_id
+        invoices = {invoice.booking_id: invoice for invoice in Invoice.query.filter_by(season_id=selected_season.id).all()}
 
     return render_template(
         'bookings_base.html',
@@ -106,7 +107,7 @@ def index():
         seasons=seasons,
         selected_season=selected_season,
         bookings=bookings,
-        invoices=invoices,  # Pass invoices to the template
+        invoices=invoices,  # Pass invoices as a dictionary
         page_title="Andelsbiodling",
         import_url=url_for('andelsbiodling.import_bookings')
     )
@@ -162,9 +163,34 @@ def send_invoices():
         return jsonify({'error': 'No bookings selected'}), 400
     
     bookings = Bookings.query.filter(Bookings.id.in_(booking_ids)).all()
-    
+    season = bookings[0].season if bookings else None
+
+    if not season:
+        return jsonify({'error': 'No season found for bookings'}), 400
+
     try:
         for booking in bookings:
+            # Check if invoice already exists
+            existing_invoice = Invoice.query.filter_by(booking_id=booking.id).first()
+            if existing_invoice:
+                continue  # Skip if invoice already exists
+
+            # Generate a unique invoice ID
+            invoice_id = f"INV-{season.year}-{booking.id:04d}"
+
+            # Create new invoice
+            invoice = Invoice(
+                booking_id=booking.id,
+                season_id=season.id,
+                invoice_id=invoice_id,
+                date_created=datetime.now(),
+                sent=True,
+                number=booking.id,  # Using booking ID as invoice number
+                tot_sum=season.price * booking.number
+            )
+            db.session.add(invoice)
+
+            # Send email
             msg = Message(
                 'Your Invoice',
                 sender='noreply@example.com',
@@ -173,7 +199,12 @@ def send_invoices():
             msg.body = f"Here's your invoice"
             current_app.extensions['mail'].send(msg)
         
-        return jsonify({'success': True, 'message': f'Invoices sent to {len(bookings)} recipients'})
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f'Invoices created and sent to {len(bookings)} recipients'
+        })
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error sending invoices: {str(e)}")
         return jsonify({'error': str(e)}), 500
