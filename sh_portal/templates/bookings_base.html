@@ -195,11 +195,72 @@
     </div>
 </div>
 
+<!-- Manage Booking Modal -->
+<div class="modal fade" id="manageBookingModal" tabindex="-1" aria-labelledby="manageBookingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manageBookingModalLabel">Manage Booking</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="manageBookingForm" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" id="bookingId" name="booking_id">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="telephone" class="form-label">Telephone</label>
+                            <input type="tel" class="form-control" id="telephone" name="telephone" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="number" class="form-label">Number</label>
+                            <input type="number" class="form-control" id="number" name="number" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="address" class="form-label">Address</label>
+                            <input type="text" class="form-control" id="address" name="address" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="postnummer" class="form-label">Postnummer</label>
+                            <input type="text" class="form-control" id="postnummer" name="postnummer" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="ort" class="form-label">Ort</label>
+                            <input type="text" class="form-control" id="ort" name="ort" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="message" class="form-label">Message</label>
+                        <textarea class="form-control" id="message" name="message" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('selectAll');
     const bookingCheckboxes = document.querySelectorAll('.booking-checkbox');
     const sendInvoiceBtn = document.getElementById('sendInvoiceBtn');
+    const manageBookingModal = new bootstrap.Modal(document.getElementById('manageBookingModal'));
+    const manageBookingForm = document.getElementById('manageBookingForm');
 
     // Function to update action buttons state
     function updateActionButtons() {
@@ -219,17 +280,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Individual checkbox functionality
     bookingCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            // Update "Select All" checkbox state
             const allChecked = Array.from(bookingCheckboxes).every(cb => cb.checked);
             const someChecked = Array.from(bookingCheckboxes).some(cb => cb.checked);
             selectAllCheckbox.checked = allChecked;
             selectAllCheckbox.indeterminate = someChecked && !allChecked;
-            
             updateActionButtons();
         });
     });
 
-    // Action buttons click handlers
+    // Send invoice button click handler
     sendInvoiceBtn.addEventListener('click', function() {
         const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
             .map(cb => cb.value);
@@ -237,12 +296,61 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Send invoice for bookings:', selectedBookings);
     });
 
-    // Manage booking button click handler
+    // Individual manage booking buttons
     document.querySelectorAll('.manage-booking').forEach(button => {
         button.addEventListener('click', function() {
-            const bookingId = this.getAttribute('data-booking-id');
-            // TODO: Implement manage booking functionality
-            console.log('Manage booking:', bookingId);
+            const bookingId = this.dataset.bookingId;
+            const row = this.closest('tr');
+
+            // Populate form with booking data
+            document.getElementById('bookingId').value = bookingId;
+            document.getElementById('name').value = row.cells[1].textContent;
+            document.getElementById('number').value = row.cells[2].textContent;
+
+            // Fetch full booking details
+            fetch(`/api/booking/${bookingId}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('email').value = data.email;
+                    document.getElementById('telephone').value = data.telephone;
+                    document.getElementById('address').value = data.address;
+                    document.getElementById('postnummer').value = data.postnummer;
+                    document.getElementById('ort').value = data.ort;
+                    document.getElementById('message').value = data.message;
+
+                    // Show the modal
+                    manageBookingModal.show();
+                })
+                .catch(error => {
+                    console.error('Error fetching booking details:', error);
+                    alert('Error loading booking details');
+                });
+        });
+    });
+
+    // Handle form submission
+    manageBookingForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const bookingId = formData.get('booking_id');
+
+        fetch(`/api/booking/${bookingId}`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                manageBookingModal.hide();
+                // Reload the page to show updated data
+                window.location.reload();
+            } else {
+                alert('Error updating booking: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating booking:', error);
+            alert('Error updating booking');
         });
     });
 });

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app
+from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify
 from .models import Season, Bookings, Invoice
 from . import db
 from google.oauth2.credentials import Credentials
@@ -109,3 +109,44 @@ def index():
         page_title="Andelsbiodling",
         import_url=url_for('andelsbiodling.import_bookings')
     )
+
+@andelsbiodling.route('/api/booking/<int:booking_id>', methods=['GET'])
+def get_booking(booking_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    booking = Bookings.query.get_or_404(booking_id)
+    return jsonify({
+        'id': booking.id,
+        'name': booking.name,
+        'email': booking.email,
+        'telephone': booking.telephone,
+        'address': booking.address,
+        'postnummer': booking.postnummer,
+        'ort': booking.ort,
+        'message': booking.message,
+        'number': booking.number
+    })
+
+@andelsbiodling.route('/api/booking/<int:booking_id>', methods=['POST'])
+def update_booking(booking_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    booking = Bookings.query.get_or_404(booking_id)
+
+    try:
+        booking.name = request.form.get('name')
+        booking.email = request.form.get('email')
+        booking.telephone = request.form.get('telephone')
+        booking.address = request.form.get('address')
+        booking.postnummer = request.form.get('postnummer')
+        booking.ort = request.form.get('ort')
+        booking.message = request.form.get('message')
+        booking.number = int(request.form.get('number'))
+
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
