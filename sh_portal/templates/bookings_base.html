@@ -88,9 +88,6 @@
                                     <button type="button" class="btn btn-primary" id="sendInvoiceBtn" disabled>
                                         <i class="bi bi-envelope"></i> Send Invoice
                                     </button>
-                                    <button type="button" class="btn btn-secondary" id="manageBookingBtn" disabled>
-                                        <i class="bi bi-gear"></i> Manage Booking
-                                    </button>
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-hover">
@@ -102,11 +99,10 @@
                                                     </div>
                                                 </th>
                                                 <th>Name</th>
-                                                <th>Email</th>
-                                                <th>Telephone</th>
-                                                <th>Address</th>
                                                 <th>Number</th>
-                                                <th>Message</th>
+                                                <th>Status</th>
+                                                <th>Payment</th>
+                                                <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -119,11 +115,29 @@
                                                     </div>
                                                 </td>
                                                 <td>{{ booking.name }}</td>
-                                                <td>{{ booking.email }}</td>
-                                                <td>{{ booking.telephone }}</td>
-                                                <td>{{ booking.address }}</td>
                                                 <td>{{ booking.number }}</td>
-                                                <td>{{ booking.message }}</td>
+                                                <td>
+                                                    {% if booking.id in invoices %}
+                                                        <span class="badge bg-success">Invoiced</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">Not Invoiced</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if booking.id in invoices and invoices[booking.id].date_payed %}
+                                                        <span class="badge bg-success">Paid</span>
+                                                    {% elif booking.id in invoices %}
+                                                        <span class="badge bg-warning">Unpaid</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">N/A</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary manage-booking" 
+                                                            data-booking-id="{{ booking.id }}">
+                                                        <i class="bi bi-gear"></i> Manage
+                                                    </button>
+                                                </td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
@@ -186,14 +200,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('selectAll');
     const bookingCheckboxes = document.querySelectorAll('.booking-checkbox');
     const sendInvoiceBtn = document.getElementById('sendInvoiceBtn');
-    const manageBookingBtn = document.getElementById('manageBookingBtn');
 
     // Function to update action buttons state
     function updateActionButtons() {
         const checkedBoxes = document.querySelectorAll('.booking-checkbox:checked');
         const hasChecked = checkedBoxes.length > 0;
         sendInvoiceBtn.disabled = !hasChecked;
-        manageBookingBtn.disabled = !hasChecked;
     }
 
     // Select all checkbox functionality
@@ -225,11 +237,13 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Send invoice for bookings:', selectedBookings);
     });
 
-    manageBookingBtn.addEventListener('click', function() {
-        const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
-            .map(cb => cb.value);
-        // TODO: Implement manage booking functionality
-        console.log('Manage bookings:', selectedBookings);
+    // Manage booking button click handler
+    document.querySelectorAll('.manage-booking').forEach(button => {
+        button.addEventListener('click', function() {
+            const bookingId = this.getAttribute('data-booking-id');
+            // TODO: Implement manage booking functionality
+            console.log('Manage booking:', bookingId);
+        });
     });
 });
 </script>
