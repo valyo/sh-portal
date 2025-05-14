@@ -307,11 +307,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Determine the API prefix based on the page title
+        const pageTitle = document.querySelector('h1').textContent.trim();
+        const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
+
         // Show loading state
         sendInvoiceBtn.disabled = true;
         sendInvoiceBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
 
-        fetch('/lammandel/api/send-invoices', {
+        fetch(`${apiPrefix}/api/send-invoices`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -353,8 +357,12 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('name').value = row.cells[1].textContent;
             document.getElementById('quantity').value = row.cells[2].textContent;
 
+            // Determine the API prefix based on the page title
+            const pageTitle = document.querySelector('h1').textContent.trim();
+            const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
+
             // Fetch full booking details
-            fetch(`/lammandel/api/booking/${bookingId}`)
+            fetch(`${apiPrefix}/api/booking/${bookingId}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('email').value = data.email;
@@ -380,7 +388,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(this);
         const bookingId = formData.get('booking_id');
 
-        fetch(`/lammandel/api/booking/${bookingId}`, {
+        // Determine the API prefix based on the page title
+        const pageTitle = document.querySelector('h1').textContent.trim();
+        const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
+
+        fetch(`${apiPrefix}/api/booking/${bookingId}`, {
             method: 'POST',
             body: formData
         })
