@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Invoice {{ invoice.invoice_id }}</title>
+    <title>Faktura {{ invoice.invoice_id }}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -55,40 +55,40 @@
 <body>
     <div class="invoice-header">
         <div>
-            <h1>INVOICE</h1>
-            <p>Invoice ID: {{ invoice.invoice_id }}</p>
-            <p>Date: {{ invoice.date_created.strftime('%Y-%m-%d') }}</p>
+            <h1>FAKTURA</h1>
+            <p>Fakturanummer: {{ invoice.invoice_id }}</p>
+            <p>Datum: {{ invoice.date_created.strftime('%Y-%m-%d') }}</p>
         </div>
         <div>
-            <h2>Solberg Honung</h2>
-            <p>Närpoducerat honung från egen biodling</p>
-            <p>Your Address</p>
-            <p>Your City, Postal Code</p>
-            <p>Your Country</p>
+            <h2>SH Portal</h2>
+            <p>Företagsnamn</p>
+            <p>Adress</p>
+            <p>Stad, Postnummer</p>
+            <p>Sverige</p>
         </div>
     </div>
 
     <div class="invoice-details">
-        <h3>Bill To:</h3>
+        <h3>Fakturera till:</h3>
         <p>{{ booking.name }}</p>
         <p>{{ booking.address }}</p>
         <p>{{ booking.postnummer }} {{ booking.ort }}</p>
-        <p>Email: {{ booking.email }}</p>
-        <p>Phone: {{ booking.telephone }}</p>
+        <p>E-post: {{ booking.email }}</p>
+        <p>Telefon: {{ booking.telephone }}</p>
     </div>
 
     <table class="invoice-table">
         <thead>
             <tr>
-                <th>Description</th>
-                <th>Quantity</th>
-                <th>Unit Price</th>
-                <th>Amount</th>
+                <th>Beskrivning</th>
+                <th>Antal</th>
+                <th>Á-pris</th>
+                <th>Belopp</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andelsbiodling' }} - Season {{ invoice.season.year if invoice.season else '' }}</td>
+                <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andelsbiodling' }} - Säsong {{ invoice.season.year if invoice.season else '' }}</td>
                 <td>{{ invoice.quantity }}</td>
                 <td>{{ "%.2f"|format(invoice.season.price_lamm if 'LAMM' in invoice.invoice_id and invoice.season else invoice.season.price if invoice.season else 0) }} SEK</td>
                 <td>{{ "%.2f"|format(invoice.tot_sum) }} SEK</td>
@@ -99,23 +99,23 @@
     <div class="totals">
         <table>
             <tr>
-                <td>Subtotal:</td>
+                <td>Delsumma:</td>
                 <td>{{ "%.2f"|format(invoice.tot_sum / 1.12) }} SEK</td>
             </tr>
             <tr>
-                <td>VAT (12%):</td>
+                <td>Moms (12%):</td>
                 <td>{{ "%.2f"|format(invoice.tot_sum - (invoice.tot_sum / 1.12)) }} SEK</td>
             </tr>
             <tr class="total-row">
-                <td>Total:</td>
+                <td>Summa:</td>
                 <td>{{ "%.2f"|format(invoice.tot_sum) }} SEK</td>
             </tr>
         </table>
     </div>
 
     <div class="footer">
-        <p>Thank you for your business!</p>
-        <p>Please include the invoice number in your payment reference.</p>
+        <p>Tack för din beställning!</p>
+        <p>Vänligen ange fakturanumret som referens vid betalning.</p>
     </div>
 </body>
 </html> 
