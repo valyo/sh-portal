@@ -183,15 +183,23 @@ def send_invoices():
                     tot_sum=season.price_lamm * booking.quantity
                 )
                 db.session.add(invoice)
+                # Commit the invoice first
+                db.session.commit()
+                # Now refresh to load relationships
+                db.session.refresh(invoice)
                 current_app.logger.info(f"Created invoice object for booking {booking.id}")
 
                 # Send email
                 msg = Message(
-                    'Your Invoice',
+                    f'Invoice for {booking.name} - {invoice.invoice_id}',
                     sender='noreply@example.com',
                     recipients=[booking.email]
                 )
-                msg.body = f"Here's your invoice"
+                msg.html = render_template(
+                    'invoice_template.html',
+                    invoice=invoice,
+                    booking=booking
+                )
                 current_app.logger.info(f"Sending email to {booking.email}")
                 current_app.extensions['mail'].send(msg)
                 
@@ -207,7 +215,6 @@ def send_invoices():
                 errors.append(error_msg)
                 continue
         
-        db.session.commit()
         current_app.logger.info(f"Successfully processed {successful_invoices} invoices, {failed_invoices} failed")
         return jsonify({
             'success': True,

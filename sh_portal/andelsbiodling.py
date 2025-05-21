@@ -189,17 +189,24 @@ def send_invoices():
                 tot_sum=season.price * booking.quantity
             )
             db.session.add(invoice)
+            # Commit the invoice first
+            db.session.commit()
+            # Now refresh to load relationships
+            db.session.refresh(invoice)
 
             # Send email
             msg = Message(
-                'Your Invoice',
+                f'Invoice for {booking.name} - {invoice.invoice_id}',
                 sender='noreply@example.com',
                 recipients=[booking.email]
             )
-            msg.body = f"Here's your invoice"
+            msg.html = render_template(
+                'invoice_template.html',
+                invoice=invoice,
+                booking=booking
+            )
             current_app.extensions['mail'].send(msg)
         
-        db.session.commit()
         return jsonify({
             'success': True,
             'message': f'Invoices created and sent to {len(bookings)} recipients'
