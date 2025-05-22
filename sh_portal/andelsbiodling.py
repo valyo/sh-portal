@@ -5,7 +5,7 @@ from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 from .utils import import_bookings_from_sheet
 from flask_mail import Message
@@ -127,7 +127,7 @@ def get_booking(booking_id):
         'postnummer': booking.postnummer,
         'ort': booking.ort,
         'message': booking.message,
-        'number': booking.number
+        'quantity': booking.quantity
     })
 
 @andelsbiodling.route('/api/booking/<int:booking_id>', methods=['POST'])
@@ -145,7 +145,7 @@ def update_booking(booking_id):
         booking.postnummer = request.form.get('postnummer')
         booking.ort = request.form.get('ort')
         booking.message = request.form.get('message')
-        booking.number = int(request.form.get('number'))
+        booking.quantity = int(request.form.get('quantity'))
 
         db.session.commit()
         return jsonify({'success': True})
@@ -203,7 +203,8 @@ def send_invoices():
             msg.html = render_template(
                 'invoice_template.html',
                 invoice=invoice,
-                booking=booking
+                booking=booking,
+                timedelta=timedelta
             )
             current_app.extensions['mail'].send(msg)
         

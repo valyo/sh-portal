@@ -3,7 +3,7 @@ from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
 from .utils import import_bookings_from_sheet
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_mail import Message
 
 lammandel = Blueprint('lammandel', __name__)
@@ -198,7 +198,8 @@ def send_invoices():
                 msg.html = render_template(
                     'invoice_template.html',
                     invoice=invoice,
-                    booking=booking
+                    booking=booking,
+                    timedelta=timedelta
                 )
                 current_app.logger.info(f"Sending email to {booking.email}")
                 current_app.extensions['mail'].send(msg)
