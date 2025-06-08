@@ -204,8 +204,16 @@ def send_invoices():
                 'invoice_template.html',
                 invoice=invoice,
                 booking=booking,
-                timedelta=timedelta
+                timedelta=timedelta,
+                logo_cid='logo',
+                swish_qr_cid='swish_qr'
             )
+            # Attach logo as inline image
+            with current_app.open_resource('static/logo.png') as fp:
+                msg.attach('logo.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<logo>']])
+            # Attach swish QR as inline image
+            with current_app.open_resource('static/swish_qr.png') as fp:
+                msg.attach('swish_qr.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<swish_qr>']])
             current_app.extensions['mail'].send(msg)
         
         return jsonify({
