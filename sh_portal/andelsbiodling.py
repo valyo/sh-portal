@@ -196,7 +196,7 @@ def send_invoices():
 
             # Send email
             msg = Message(
-                f'Invoice for {booking.name} - {invoice.invoice_id}',
+                f'Faktura från Solberg Honung (Andelsbiodling {season.year}) - {booking.name}',
                 sender='noreply@example.com',
                 recipients=[booking.email]
             )
