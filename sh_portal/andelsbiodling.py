@@ -176,7 +176,7 @@ def send_invoices():
                 continue  # Skip if invoice already exists
 
             # Generate a unique invoice ID
-            invoice_id = f"INV-{season.year}-{booking.id:04d}"
+            invoice_id = f"F-{season.year}-{booking.id:04d}"
 
             # Create new invoice
             invoice = Invoice(
