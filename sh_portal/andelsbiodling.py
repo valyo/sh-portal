@@ -169,10 +169,13 @@ def send_invoices():
         return jsonify({'error': 'No season found for bookings'}), 400
 
     try:
+        sent_count = 0
+        skipped_count = 0
         for booking in bookings:
             # Check if invoice already exists
             existing_invoice = Invoice.query.filter_by(booking_id=booking.id).first()
             if existing_invoice:
+                skipped_count += 1
                 continue  # Skip if invoice already exists
 
             # Generate a unique invoice ID
@@ -215,10 +218,15 @@ def send_invoices():
             with current_app.open_resource('static/swish_qr.png') as fp:
                 msg.attach('swish_qr.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<swish_qr>']])
             current_app.extensions['mail'].send(msg)
+            sent_count += 1
         
+        message = f'Invoices created and sent to {sent_count} recipients.'
+        if skipped_count > 0:
+            message += f' {skipped_count} invoices already existed and were skipped.'
+
         return jsonify({
             'success': True,
-            'message': f'Invoices created and sent to {len(bookings)} recipients'
+            'message': message
         })
     except Exception as e:
         db.session.rollback()
