@@ -38,6 +38,7 @@ def import_bookings_from_sheet(
     for _, row in df.iterrows():
         try:
             timestamp_obj = datetime.strptime(row['timestamp'], '%m/%d/%Y %H:%M:%S')
+            current_app.logger.info(f"Timestamp: {timestamp_obj}")
         except Exception as e:
             current_app.logger.error(f"Error parsing timestamp: {str(e)}")
             flash(f'Error parsing timestamp for booking: {row["email"]}', 'error')
@@ -59,7 +60,7 @@ def import_bookings_from_sheet(
                 postnummer=row['postnummer'],
                 ort=row['ort'],
                 message=row['message'],
-                number=int(row['number'])
+                quantity=int(row['number'])
             )
             db.session.add(booking)
             imported_count += 1

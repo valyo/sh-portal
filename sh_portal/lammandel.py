@@ -33,7 +33,7 @@ def import_bookings():
         from .andelsbiodling import get_sheet_data
         data = get_sheet_data(sheet_id, range_name)
         if not data:
-            flash('Could not fetch data from Google Sheet.', 'error')
+            flash('The Google Sheet range is empty or no data was found.', 'error')
             return redirect(url_for('lammandel.index'))
 
         success = import_bookings_from_sheet(
@@ -46,7 +46,7 @@ def import_bookings():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error importing bookings: {str(e)}")
-        flash('An error occurred while importing bookings.', 'error')
+        flash(f'An error occurred while importing bookings: {str(e)}', 'error')
 
     return redirect(url_for('lammandel.index', season_id=season_id))
 

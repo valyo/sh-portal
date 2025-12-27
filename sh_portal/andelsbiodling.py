@@ -16,25 +16,20 @@ def get_sheet_data(sheet_id, range_name):
     """
     Fetch data from Google Sheet using service account
     """
-    try:
-        # Use service account credentials
-        SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-        credentials = service_account.Credentials.from_service_account_file(
-            'sh-web-portal-f370fff1378a.json',  # You'll need to create this
-            scopes=SCOPES
-        )
-        current_app.logger.info(f"Credentials: {type(credentials)}")
-        service = build('sheets', 'v4', credentials=credentials)
-        sheet = service.spreadsheets()
-        result = sheet.values().get(
-            spreadsheetId=sheet_id,
-            range=range_name
-        ).execute()
+    # Use service account credentials
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    credentials = service_account.Credentials.from_service_account_file(
+        'sh-web-portal-f370fff1378a.json',  # You'll need to create this
+        scopes=SCOPES
+    )
+    service = build('sheets', 'v4', credentials=credentials)
+    sheet = service.spreadsheets()
+    result = sheet.values().get(
+        spreadsheetId=sheet_id,
+        range=range_name
+    ).execute()
 
-        return result.get('values', [])
-    except Exception as e:
-        current_app.logger.error(f"Error fetching sheet data: {str(e)}")
-        return None
+    return result.get('values', [])
 
 def extract_sheet_id(sheet_link):
     """
@@ -62,7 +57,7 @@ def import_bookings():
 
         data = get_sheet_data(sheet_id, range_name)
         if not data:
-            flash('Could not fetch data from Google Sheet.', 'error')
+            flash('The Google Sheet range is empty or no data was found.', 'error')
             return redirect(url_for('andelsbiodling.index'))
 
         success = import_bookings_from_sheet(
@@ -75,7 +70,7 @@ def import_bookings():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error importing bookings: {str(e)}")
-        flash('An error occurred while importing bookings.', 'error')
+        flash(f'An error occurred while importing bookings: {str(e)}', 'error')
 
     return redirect(url_for('andelsbiodling.index', season_id=season_id))
 
