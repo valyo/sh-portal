@@ -7,7 +7,7 @@ colorama==0.4.6
 commitizen==2.24.0
 decli==0.5.2
 distlib==0.3.6
-filelock==3.12.2
+filelock==3.20.1
 Flask==2.2.5
 Flask-Dance==7.0.0
 Flask-Login==0.6.2
