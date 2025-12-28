@@ -18,7 +18,8 @@ RUN apk add --no-cache --virtual --update \
     libxslt libxslt-dev \
     libjpeg-turbo-dev zlib-dev \
     libpq postgresql-dev \
-    musl-dev wget git build-base
+    musl-dev wget git build-base \
+    cairo-dev freetype-dev harfbuzz-dev fribidi-dev
 
 # install the dependencies and packages in the requirements file
 RUN pip install --upgrade pip \ 

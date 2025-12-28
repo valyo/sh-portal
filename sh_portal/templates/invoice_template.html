@@ -71,9 +71,6 @@
         .invoice-info .value {
             font-weight: bold;
         }
-        .invoice-info .due {
-            color: #6d2e1c;
-        }
         .invoice-info .to-pay {
             background: #eee;
             font-size: 1.3em;
@@ -96,8 +93,6 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 0;
-            border-radius: 15px;
-            overflow: hidden;
         }
         .items-table th, .items-table td {
             padding: 10px 8px;
@@ -112,9 +107,6 @@
         .items-table td {
             border-bottom: 1px solid #eee;
         }
-        .items-table tr:last-child td {
-            border-bottom: none;
-        }
         .swish-block {
             display: flex;
             align-items: center;
@@ -123,7 +115,7 @@
         .swish-img {
             border: 2px solid #bbb;
             border-radius: 15px;
-            padding: 10px 20px 10px 20px;
+            padding: 10px 20px;
             background: #fff;
             margin-right: 30px;
             text-align: center;
@@ -141,12 +133,7 @@
             margin: 0 40px 0 0;
             text-align: right;
             font-size: 1.1em;
-        }
-        .totals-block .label {
-            color: #3d1f1c;
-        }
-        .totals-block .value {
-            font-weight: bold;
+            flex-grow: 1;
         }
         .totals-block .total {
             color: #6d2e1c;
@@ -155,9 +142,6 @@
             border-top: 2px solid #bbb;
             padding-top: 10px;
             margin-top: 15px;
-        }
-        .totals-block > div {
-            margin-bottom: 8px;
         }
         .payment-instructions {
             margin: 30px 40px 0 40px;
@@ -250,9 +234,7 @@
     <div class="footer">
         <div class="footer-col">
             <strong>Solberg Honung</strong><br>
-            Solberg 123<br>
-            740 47 Harbo<br>
-            Sverige<br>
+            Solberg 123, 740 47 Harbo<br>
             Org.nr. 769029-0998<br>
             Momsreg.nr.: SE769029099801
         </div>
@@ -260,16 +242,13 @@
             <strong>Kontaktuppgifter</strong><br>
             Valentin Georgiev<br>
             Tel.: 0725 123 183<br>
-            E-post: solberghonung@gmail.com<br>
-            www.facebook.com/solberghonung<br>
-            www.solberghonung.se
+            E-post: solberghonung@gmail.com
         </div>
         <div class="footer-col">
             <strong>Betalningsuppgifter</strong><br>
             Swish: 0725 123 183<br>
-            Bankkontonr. (Nordea):<br>
-            1819 27 74 147
+            Bankkontonr. (Nordea): 1819 27 74 147
         </div>
     </div>
 </body>
-</html> 
+</html>

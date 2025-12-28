@@ -1,6 +1,35 @@
 from datetime import datetime
 from flask import current_app, flash
 import pandas as pd
+import os
+from xhtml2pdf import pisa
+from io import BytesIO
+
+def generate_invoice_pdf(html_content, output_path):
+    """
+    Converts HTML content to a PDF file.
+    """
+    try:
+        # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Replace cid: references with local paths for PDF generation
+        # This is a simple hack since xhtml2pdf doesn't support CIDs
+        # We assume the images are in sh_portal/static/
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        static_dir = os.path.join(base_dir, 'sh_portal', 'static')
+
+        # Convert cid:logo to actual path
+        html_content = html_content.replace('cid:logo', os.path.join(static_dir, 'logo.png'))
+        html_content = html_content.replace('cid:swish_qr', os.path.join(static_dir, 'swish_qr.png'))
+
+        with open(output_path, "wb") as f:
+            pisa_status = pisa.CreatePDF(html_content, dest=f)
+
+        return not pisa_status.err
+    except Exception as e:
+        current_app.logger.error(f"Error generating PDF: {str(e)}")
+        return False
 
 def import_bookings_from_sheet(
     db,
@@ -73,4 +102,4 @@ def import_bookings_from_sheet(
         db.session.rollback()
         current_app.logger.error(f"Error committing bookings: {str(e)}")
         flash('An error occurred while importing bookings.', 'error')
-        return False 
+        return False

@@ -2,7 +2,8 @@ from flask import Blueprint, render_template, redirect, url_for, session, reques
 from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
-from .utils import import_bookings_from_sheet
+import os
+from .utils import import_bookings_from_sheet, generate_invoice_pdf
 from datetime import datetime, timedelta
 from flask_mail import Message
 
@@ -54,7 +55,7 @@ def import_bookings():
 def index():
     if not session.get('user'):
         return redirect(url_for('main.home'))
-    
+
     seasons = Season.query.order_by(Season.year.desc()).all()
     selected_season_id = request.form.get('season_id') or request.args.get('season_id')
     selected_season = None
@@ -129,24 +130,24 @@ def send_invoices():
     if not session.get('user'):
         current_app.logger.error("Unauthorized attempt to send invoices")
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     booking_ids = request.json.get('booking_ids', [])
     season_id = request.json.get('season_id')
     current_app.logger.info(f"Received request to send invoices for booking IDs: {booking_ids} in season: {season_id}")
-    
+
     if not booking_ids:
         current_app.logger.error("No booking IDs provided")
         return jsonify({'error': 'No bookings selected'}), 400
-    
+
     if not season_id:
         current_app.logger.error("No season ID provided")
         return jsonify({'error': 'No season selected'}), 400
-    
+
     season = Season.query.get(season_id)
     if not season:
         current_app.logger.error(f"Season {season_id} not found")
         return jsonify({'error': 'Season not found'}), 400
-    
+
     bookings = BookingsLamm.query.filter(
         BookingsLamm.id.in_(booking_ids),
         BookingsLamm.season_id == season_id
@@ -160,7 +161,7 @@ def send_invoices():
     try:
         for booking in bookings:
             current_app.logger.info(f"Processing booking {booking.id} for {booking.name}")
-            
+
             # Check if invoice already exists
             existing_invoice = InvoiceLamm.query.filter_by(booking_id=booking.id).first()
             if existing_invoice:
@@ -209,21 +210,40 @@ def send_invoices():
                 # Attach swish QR as inline image
                 with current_app.open_resource('static/swish_qr.png') as fp:
                     msg.attach('swish_qr.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<swish_qr>']])
+
+                # Generate PDF content for attachment
+                pdf_html = render_template(
+                    'invoice_pdf_template.html',
+                    invoice=invoice,
+                    booking=booking,
+                    timedelta=timedelta,
+                    logo_cid='logo',
+                    swish_qr_cid='swish_qr'
+                )
+                pdf_filename = f"{invoice.invoice_id}.pdf"
+                pdf_path = os.path.join(current_app.root_path, '..', 'invoices', 'lammandel', str(season.year), pdf_filename)
+
+                # Save the PDF to file
+                if generate_invoice_pdf(pdf_html, pdf_path):
+                    # Attach the PDF to the email
+                    with open(pdf_path, 'rb') as fp:
+                        msg.attach(pdf_filename, 'application/pdf', fp.read())
+
                 current_app.logger.info(f"Sending email to {booking.email}")
                 current_app.extensions['mail'].send(msg)
-                
+
                 # Only mark as sent if email was successful
                 invoice.sent = True
                 successful_invoices += 1
                 current_app.logger.info(f"Successfully sent invoice for booking {booking.id}")
-                
+
             except Exception as e:
                 failed_invoices += 1
                 error_msg = f"Error processing booking {booking.id}: {str(e)}"
                 current_app.logger.error(error_msg)
                 errors.append(error_msg)
                 continue
-        
+
         current_app.logger.info(f"Successfully processed {successful_invoices} invoices, {failed_invoices} failed")
         return jsonify({
             'success': True,
@@ -234,4 +254,4 @@ def send_invoices():
         db.session.rollback()
         error_msg = f"Error sending invoices: {str(e)}"
         current_app.logger.error(error_msg)
-        return jsonify({'error': error_msg}), 500 
+        return jsonify({'error': error_msg}), 500

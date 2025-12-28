@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Faktura {{ invoice.invoice_id }}</title>
+    <style>
+        @page {
+            size: a4;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #3d1f1c;
+            background: #fff;
+            font-size: 10pt;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .header-table td {
+            vertical-align: top;
+        }
+        .logo-block img {
+            height: 60px;
+        }
+        .tagline {
+            font-size: 9pt;
+            margin-top: 5px;
+            color: #3d1f1c;
+            font-style: italic;
+        }
+        .faktura-title {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #6d2e1c;
+            text-align: right;
+        }
+        .divider {
+            border-top: 3px solid #6d2e1c;
+            margin: 10px 0;
+        }
+        .main-table {
+            margin-top: 20px;
+        }
+        .main-table td {
+            vertical-align: top;
+            width: 50%;
+        }
+        .customer-info {
+            line-height: 1.4;
+        }
+        .invoice-info {
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fafafa;
+        }
+        .invoice-info table td {
+            padding: 2px 0;
+            font-size: 9pt;
+        }
+        .invoice-info .label {
+            color: #3d1f1c;
+            width: 130px;
+        }
+        .invoice-info .value {
+            font-weight: bold;
+        }
+        .to-pay {
+            background: #eee;
+            font-size: 12pt;
+            font-weight: bold;
+            color: #222;
+            padding: 6px;
+            text-align: center;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+        .items-block {
+            margin-top: 25px;
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .items-table th, .items-table td {
+            padding: 8px;
+            text-align: left;
+            font-size: 9pt;
+        }
+        .items-table th {
+            background: #f5f5f5;
+            color: #3d1f1c;
+            font-weight: bold;
+            border-bottom: 1px solid #bbb;
+        }
+        .items-table td {
+            border-bottom: 1px solid #eee;
+        }
+        .swish-totals-table {
+            margin-top: 15px;
+        }
+        .swish-totals-table td {
+            vertical-align: top;
+        }
+        .swish-img-container {
+            width: 150px;
+        }
+        .swish-img {
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            padding: 8px;
+            background: #fff;
+            text-align: center;
+        }
+        .swish-img img {
+            height: 90px;
+            width: 90px;
+        }
+        .swish-number {
+            color: #6d2e1c;
+            font-weight: bold;
+            font-size: 9pt;
+            margin-top: 4px;
+        }
+        .totals-block {
+            text-align: right;
+            padding-top: 8px;
+        }
+        .totals-block .label {
+            color: #3d1f1c;
+            padding-right: 8px;
+            font-size: 9pt;
+        }
+        .totals-block .value {
+            font-weight: bold;
+            display: inline-block;
+            min-width: 70px;
+            font-size: 9pt;
+        }
+        .totals-block .total {
+            color: #6d2e1c;
+            font-size: 12pt;
+            font-weight: bold;
+            border-top: 1px solid #bbb;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        .payment-instructions {
+            margin-top: 25px;
+            font-size: 10pt;
+            border-left: 3px solid #6d2e1c;
+            padding-left: 10px;
+        }
+        .footer-table {
+            margin-top: 40px;
+            background: #f5f5f5;
+            padding: 10px;
+            font-size: 8pt;
+            border-radius: 4px;
+        }
+        .footer-table td {
+            width: 33%;
+            vertical-align: top;
+            padding: 4px;
+        }
+        .footer-table strong {
+            color: #6d2e1c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <table class="header-table">
+            <tr>
+                <td>
+                    <div class="logo-block">
+                        <img src="cid:{{ logo_cid }}" alt="Solberg Honung logotyp">
+                        <div class="tagline">Närproducerat honung från egen biodling</div>
+                    </div>
+                </td>
+                <td class="faktura-title">Faktura</td>
+            </tr>
+        </table>
+
+        <div class="divider"></div>
+
+        <table class="main-table">
+            <tr>
+                <td>
+                    <div class="customer-info">
+                        <strong>Beställare:</strong><br>
+                        {{ booking.name }}<br>
+                        {{ booking.address }}<br>
+                        {{ booking.postnummer }} {{ booking.ort }}<br>
+                        {{ booking.email }}
+                    </div>
+                </td>
+                <td>
+                    <div class="invoice-info">
+                        <table>
+                            <tr><td class="label">Fakturadatum:</td><td class="value">{{ invoice.date_created.strftime('%Y-%m-%d') }}</td></tr>
+                            <tr><td class="label">Fakturanummer:</td><td class="value">{{ invoice.invoice_id }}</td></tr>
+                            <tr><td class="label">Förfallodag:</td><td class="value">{{ (invoice.date_created + timedelta(days=15)).strftime('%Y-%m-%d') }}</td></tr>
+                            <tr><td class="label">Betalningsvillkor:</td><td class="value">15 dagar</td></tr>
+                            <tr><td class="label">Banköverföring (Nordea):</td><td class="value">1819 27 74 147</td></tr>
+                            <tr><td class="label">Swish:</td><td class="value">0725 123 183</td></tr>
+                        </table>
+                        <div class="to-pay">Att betala: {{ "%.2f"|format(invoice.tot_sum) }} kr</div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="items-block">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Beskrivning</th>
+                        <th style="width: 10%;">Antal</th>
+                        <th style="width: 15%;">Á-pris</th>
+                        <th style="width: 10%;">Moms</th>
+                        <th style="width: 25%;">Kostnad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andel Av Honungsskörden ' ~ invoice.season.year if invoice.season else '' }}</td>
+                        <td>{{ invoice.quantity }}</td>
+                        <td>{{ "%.2f"|format(invoice.season.price_lamm if 'LAMM' in invoice.invoice_id and invoice.season else invoice.season.price if invoice.season else 0) }} kr</td>
+                        <td>12%</td>
+                        <td>{{ "%.2f"|format(invoice.tot_sum) }} kr</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <table class="swish-totals-table">
+            <tr>
+                <td class="swish-img-container">
+                    <div class="swish-img">
+                        <div style="font-size:8pt; color:#6d2e1c; font-weight:bold; margin-bottom:4px;">Betala med swish</div>
+                        <img src="cid:{{ swish_qr_cid }}" alt="Swish QR kod">
+                        <div class="swish-number">072 5 123 183</div>
+                    </div>
+                </td>
+                <td>
+                    <div class="totals-block">
+                        <div><span class="label">Belopp före moms:</span> <span class="value">{{ "%.3f"|format(invoice.tot_sum / 1.12) }} kr</span></div>
+                        <div><span class="label">Total moms (12%):</span> <span class="value">{{ "%.2f"|format(invoice.tot_sum - (invoice.tot_sum / 1.12)) }} kr</span></div>
+                        <div class="total">Summa att betala: {{ "%.2f"|format(invoice.tot_sum) }} kr</div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="payment-instructions">
+            Vänligen uppge fakturanummer <strong>{{ invoice.invoice_id }}</strong> som meddelande vid betalningen.
+        </div>
+
+        <table class="footer-table">
+            <tr>
+                <td>
+                    <strong>Solberg Honung</strong><br>
+                    Solberg 123, 740 47 Harbo<br>
+                    Org.nr. 769029-0998<br>
+                    Momsreg.nr.: SE769029099801
+                </td>
+                <td>
+                    <strong>Kontakt</strong><br>
+                    Valentin Georgiev<br>
+                    Tel.: 0725 123 183<br>
+                    E-post: solberghonung@gmail.com
+                </td>
+                <td>
+                    <strong>Betalning</strong><br>
+                    Swish: 0725 123 183<br>
+                    Nordea: 1819 27 74 147
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
+
