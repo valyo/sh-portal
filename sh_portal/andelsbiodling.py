@@ -1,45 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify
 from .models import Season, Bookings, Invoice
 from . import db
-from google.oauth2.credentials import Credentials
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 import pandas as pd
 from datetime import datetime, timedelta
 import re
 import os
-from .utils import import_bookings_from_sheet, generate_invoice_pdf
+from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id
 from flask_mail import Message
 
 andelsbiodling = Blueprint('andelsbiodling', __name__)
-
-def get_sheet_data(sheet_id, range_name):
-    """
-    Fetch data from Google Sheet using service account
-    """
-    # Use service account credentials
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    credentials = service_account.Credentials.from_service_account_file(
-        'sh-web-portal-f370fff1378a.json',  # You'll need to create this
-        scopes=SCOPES
-    )
-    service = build('sheets', 'v4', credentials=credentials)
-    sheet = service.spreadsheets()
-    result = sheet.values().get(
-        spreadsheetId=sheet_id,
-        range=range_name
-    ).execute()
-
-    return result.get('values', [])
-
-def extract_sheet_id(sheet_link):
-    """
-    Extracts the Google Sheet ID from a full URL or returns the input if it's already an ID.
-    """
-    match = re.search(r'/d/([a-zA-Z0-9-_]+)', sheet_link)
-    if match:
-        return match.group(1)
-    return sheet_link  # fallback: assume it's already an ID
 
 @andelsbiodling.route('/andelsbiodling/import-bookings', methods=['POST'])
 def import_bookings():
@@ -152,88 +121,123 @@ def update_booking(booking_id):
 @andelsbiodling.route('/api/send-invoices', methods=['POST'])
 def send_invoices():
     if not session.get('user'):
+        current_app.logger.error("Unauthorized attempt to send invoices")
         return jsonify({'error': 'Unauthorized'}), 401
 
     booking_ids = request.json.get('booking_ids', [])
+    season_id = request.json.get('season_id')
+    current_app.logger.info(f"Received request to send invoices for booking IDs: {booking_ids} in season: {season_id}")
+
     if not booking_ids:
+        current_app.logger.error("No booking IDs provided")
         return jsonify({'error': 'No bookings selected'}), 400
 
-    bookings = Bookings.query.filter(Bookings.id.in_(booking_ids)).all()
-    season = bookings[0].season if bookings else None
+    if not season_id:
+        current_app.logger.error("No season ID provided")
+        return jsonify({'error': 'No season selected'}), 400
 
+    season = Season.query.get(season_id)
     if not season:
-        return jsonify({'error': 'No season found for bookings'}), 400
+        current_app.logger.error(f"Season {season_id} not found")
+        return jsonify({'error': 'Season not found'}), 400
+
+    bookings = Bookings.query.filter(
+        Bookings.id.in_(booking_ids),
+        Bookings.season_id == season_id
+    ).all()
+    current_app.logger.info(f"Found {len(bookings)} bookings for season {season_id}")
+
+    sent_count = 0
+    skipped_count = 0
+    errors = []
 
     try:
-        sent_count = 0
-        skipped_count = 0
         for booking in bookings:
+            current_app.logger.info(f"Processing booking {booking.id} for {booking.name}")
+
             # Check if invoice already exists
             existing_invoice = Invoice.query.filter_by(booking_id=booking.id).first()
             if existing_invoice:
+                current_app.logger.info(f"Invoice already exists for booking {booking.id}")
                 skipped_count += 1
-                continue  # Skip if invoice already exists
+                continue
 
             # Generate a unique invoice ID
             invoice_id = f"F-{season.year}-{booking.id:04d}"
+            current_app.logger.info(f"Generated invoice ID: {invoice_id}")
 
-            # Create new invoice
-            invoice = Invoice(
-                booking_id=booking.id,
-                season_id=season.id,
-                invoice_id=invoice_id,
-                date_created=datetime.now(),
-                sent=True,
-                quantity=booking.quantity,  # Changed from number to quantity
-                tot_sum=season.price * booking.quantity
-            )
-            db.session.add(invoice)
-            # Commit the invoice first
-            db.session.commit()
-            # Now refresh to load relationships
-            db.session.refresh(invoice)
+            try:
+                # Create new invoice
+                invoice = Invoice(
+                    booking_id=booking.id,
+                    season_id=season.id,
+                    invoice_id=invoice_id,
+                    date_created=datetime.now(),
+                    sent=False,  # Set to False initially
+                    quantity=booking.quantity,
+                    tot_sum=season.price * booking.quantity
+                )
+                db.session.add(invoice)
+                # Commit the invoice first
+                db.session.commit()
+                # Now refresh to load relationships
+                db.session.refresh(invoice)
+                current_app.logger.info(f"Created invoice object for booking {booking.id}")
 
-            # Send email
-            msg = Message(
-                f'Faktura från Solberg Honung (Andelsbiodling {season.year}) - {booking.name}',
-                sender='noreply@example.com',
-                recipients=[booking.email]
-            )
-            msg.html = render_template(
-                'invoice_template.html',
-                invoice=invoice,
-                booking=booking,
-                timedelta=timedelta,
-                logo_cid='logo',
-                swish_qr_cid='swish_qr'
-            )
-            # Attach logo as inline image
-            with current_app.open_resource('static/logo.png') as fp:
-                msg.attach('logo.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<logo>']])
-            # Attach swish QR as inline image
-            with current_app.open_resource('static/swish_qr.png') as fp:
-                msg.attach('swish_qr.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<swish_qr>']])
+                # Send email
+                msg = Message(
+                    f'Faktura från Solberg Honung (Andelsbiodling {season.year}) - {booking.name}',
+                    sender='noreply@example.com',
+                    recipients=[booking.email]
+                )
+                msg.html = render_template(
+                    'invoice_template.html',
+                    invoice=invoice,
+                    booking=booking,
+                    timedelta=timedelta,
+                    logo_cid='logo',
+                    swish_qr_cid='swish_qr'
+                )
+                # Attach logo as inline image
+                with current_app.open_resource('static/logo.png') as fp:
+                    msg.attach('logo.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<logo>']])
+                # Attach swish QR as inline image
+                with current_app.open_resource('static/swish_qr.png') as fp:
+                    msg.attach('swish_qr.png', 'image/png', fp.read(), 'inline', headers=[['Content-ID','<swish_qr>']])
 
-            # Generate PDF content for attachment
-            pdf_html = render_template(
-                'invoice_pdf_template.html',
-                invoice=invoice,
-                booking=booking,
-                timedelta=timedelta,
-                logo_cid='logo',
-                swish_qr_cid='swish_qr'
-            )
-            pdf_filename = f"{invoice.invoice_id}.pdf"
-            pdf_path = os.path.join(current_app.root_path, '..', 'invoices', 'andelsbiodling', str(season.year), pdf_filename)
+                # Generate PDF content for attachment
+                pdf_html = render_template(
+                    'invoice_pdf_template.html',
+                    invoice=invoice,
+                    booking=booking,
+                    timedelta=timedelta,
+                    logo_cid='logo',
+                    swish_qr_cid='swish_qr'
+                )
+                pdf_filename = f"{invoice.invoice_id}.pdf"
+                pdf_path = os.path.join(current_app.root_path, '..', 'invoices', 'andelsbiodling', str(season.year), pdf_filename)
 
-            # Save the PDF to file
-            if generate_invoice_pdf(pdf_html, pdf_path):
-                # Attach the PDF to the email
-                with open(pdf_path, 'rb') as fp:
-                    msg.attach(pdf_filename, 'application/pdf', fp.read())
+                # Save the PDF to file
+                if generate_invoice_pdf(pdf_html, pdf_path):
+                    # Attach the PDF to the email
+                    with open(pdf_path, 'rb') as fp:
+                        msg.attach(pdf_filename, 'application/pdf', fp.read())
 
-            current_app.extensions['mail'].send(msg)
-            sent_count += 1
+                current_app.logger.info(f"Sending email to {booking.email}")
+                current_app.extensions['mail'].send(msg)
+
+                # Only mark as sent if email was successful
+                invoice.sent = True
+                sent_count += 1
+                current_app.logger.info(f"Successfully sent invoice for booking {booking.id}")
+
+            except Exception as e:
+                error_msg = f"Error processing booking {booking.id}: {str(e)}"
+                current_app.logger.error(error_msg)
+                errors.append(error_msg)
+                continue
+
+        current_app.logger.info(f"Successfully processed {sent_count} invoices, {skipped_count} skipped")
 
         message = f'Invoices created, saved as PDF and sent to {sent_count} recipients.'
         if skipped_count > 0:
@@ -241,9 +245,11 @@ def send_invoices():
 
         return jsonify({
             'success': True,
-            'message': message
+            'message': message,
+            'errors': errors if errors else None
         })
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error sending invoices: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        error_msg = f"Error sending invoices: {str(e)}"
+        current_app.logger.error(error_msg)
+        return jsonify({'error': error_msg}), 500

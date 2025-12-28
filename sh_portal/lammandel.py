@@ -3,17 +3,11 @@ from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
 import os
-from .utils import import_bookings_from_sheet, generate_invoice_pdf
+from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id
 from datetime import datetime, timedelta
 from flask_mail import Message
 
 lammandel = Blueprint('lammandel', __name__)
-
-def extract_sheet_id(sheet_link):
-    match = re.search(r'/d/([a-zA-Z0-9-_]+)', sheet_link)
-    if match:
-        return match.group(1)
-    return sheet_link
 
 @lammandel.route('/lammandel/import-bookings', methods=['POST'])
 def import_bookings():
@@ -30,8 +24,6 @@ def import_bookings():
 
         sheet_id = extract_sheet_id(sheet_link)
 
-        # You should reuse your get_sheet_data function from andelsbiodling.py
-        from .andelsbiodling import get_sheet_data
         data = get_sheet_data(sheet_id, range_name)
         if not data:
             flash('The Google Sheet range is empty or no data was found.', 'error')
@@ -154,8 +146,8 @@ def send_invoices():
     ).all()
     current_app.logger.info(f"Found {len(bookings)} bookings for season {season_id}")
 
-    successful_invoices = 0
-    failed_invoices = 0
+    sent_count = 0
+    skipped_count = 0
     errors = []
 
     try:
@@ -166,10 +158,11 @@ def send_invoices():
             existing_invoice = InvoiceLamm.query.filter_by(booking_id=booking.id).first()
             if existing_invoice:
                 current_app.logger.info(f"Invoice already exists for booking {booking.id}")
+                skipped_count += 1
                 continue
 
             # Generate a unique invoice ID
-            invoice_id = f"INV-LAMM-{season.year}-{booking.id:04d}"
+            invoice_id = f"F-LAMM-{season.year}-{booking.id:04d}"
             current_app.logger.info(f"Generated invoice ID: {invoice_id}")
 
             try:
@@ -192,7 +185,7 @@ def send_invoices():
 
                 # Send email
                 msg = Message(
-                    f'Invoice for {booking.name} - {invoice.invoice_id}',
+                    f'Faktura från Solberg Honung (Lammandel {season.year}) - {booking.name}',
                     sender='noreply@example.com',
                     recipients=[booking.email]
                 )
@@ -234,20 +227,24 @@ def send_invoices():
 
                 # Only mark as sent if email was successful
                 invoice.sent = True
-                successful_invoices += 1
+                sent_count += 1
                 current_app.logger.info(f"Successfully sent invoice for booking {booking.id}")
 
             except Exception as e:
-                failed_invoices += 1
                 error_msg = f"Error processing booking {booking.id}: {str(e)}"
                 current_app.logger.error(error_msg)
                 errors.append(error_msg)
                 continue
 
-        current_app.logger.info(f"Successfully processed {successful_invoices} invoices, {failed_invoices} failed")
+        current_app.logger.info(f"Successfully processed {sent_count} invoices, {skipped_count} skipped")
+
+        message = f'Invoices created, saved as PDF and sent to {sent_count} recipients.'
+        if skipped_count > 0:
+            message += f' {skipped_count} invoices already existed and were skipped.'
+
         return jsonify({
             'success': True,
-            'message': f'Successfully sent {successful_invoices} invoices, {failed_invoices} failed',
+            'message': message,
             'errors': errors if errors else None
         })
     except Exception as e:

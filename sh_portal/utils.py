@@ -2,8 +2,39 @@ from datetime import datetime
 from flask import current_app, flash
 import pandas as pd
 import os
+import re
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from xhtml2pdf import pisa
 from io import BytesIO
+
+def extract_sheet_id(sheet_link):
+    """
+    Extracts the Google Sheet ID from a full URL or returns the input if it's already an ID.
+    """
+    match = re.search(r'/d/([a-zA-Z0-9-_]+)', sheet_link)
+    if match:
+        return match.group(1)
+    return sheet_link  # fallback: assume it's already an ID
+
+def get_sheet_data(sheet_id, range_name):
+    """
+    Fetch data from Google Sheet using service account
+    """
+    # Use service account credentials
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    credentials = service_account.Credentials.from_service_account_file(
+        'sh-web-portal-f370fff1378a.json',
+        scopes=SCOPES
+    )
+    service = build('sheets', 'v4', credentials=credentials)
+    sheet = service.spreadsheets()
+    result = sheet.values().get(
+        spreadsheetId=sheet_id,
+        range=range_name
+    ).execute()
+
+    return result.get('values', [])
 
 def generate_invoice_pdf(html_content, output_path):
     """
