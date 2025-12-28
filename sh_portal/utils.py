@@ -6,7 +6,29 @@ import re
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from xhtml2pdf import pisa
+from weasyprint import HTML
 from io import BytesIO
+
+def generate_pdf_weasyprint(html_content, output_path, base_url=None):
+    """
+    Converts HTML content to a PDF file using WeasyPrint.
+    """
+    try:
+        # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Use WeasyPrint to generate PDF
+        # We specify the encoding to avoid issues with special characters
+        html = HTML(string=html_content, base_url=base_url, encoding='utf-8')
+        html.write_pdf(target=output_path)
+        
+        current_app.logger.info(f"Successfully generated PDF at {output_path} using WeasyPrint")
+        return True
+    except Exception as e:
+        import traceback
+        error_msg = f"Error generating PDF with WeasyPrint: {str(e)}\n{traceback.format_exc()}"
+        current_app.logger.error(error_msg)
+        return False
 
 def extract_sheet_id(sheet_link):
     """

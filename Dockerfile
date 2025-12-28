@@ -19,7 +19,9 @@ RUN apk add --no-cache --virtual --update \
     libjpeg-turbo-dev zlib-dev \
     libpq postgresql-dev \
     musl-dev wget git build-base \
-    cairo-dev freetype-dev harfbuzz-dev fribidi-dev
+    cairo-dev freetype-dev harfbuzz-dev fribidi-dev \
+    pango-dev gdk-pixbuf-dev shared-mime-info \
+    fontconfig ttf-freefont ttf-dejavu ttf-droid ttf-liberation
 
 # install the dependencies and packages in the requirements file
 RUN pip install --upgrade pip \ 

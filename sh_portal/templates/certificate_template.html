@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+        body {
+            font-family: 'Georgia', serif;
+            color: #3d1f1c;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+        .page-border {
+            border: 1.5pt solid #3d1f1c;
+            padding: 3pt;
+            min-height: 265mm;
+        }
+        .inner-border {
+            border: 3.5pt solid #3d1f1c;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10mm;
+            min-height: 260mm;
+        }
+        .content-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .text-center { text-align: center; }
+        
+        .header-title {
+            font-size: 38pt;
+            letter-spacing: 5pt;
+            margin: 0;
+            padding: 0;
+            text-transform: uppercase;
+        }
+        .header-bee { height: 12mm; vertical-align: middle; margin-left: 10px; }
+        
+        .thick-line { height: 4pt; background-color: #3d1f1c; margin: 15px 0 2px 0; }
+        .thin-line { height: 1.5pt; background-color: #a68966; margin-bottom: 25px; }
+        
+        .intro-text { font-size: 16pt; margin: 15px 0; }
+        
+        .customer-name {
+            font-size: 40pt;
+            margin: 15px 0;
+            color: #3d1f1c;
+            font-variant: small-caps;
+        }
+        
+        .details-text {
+            font-size: 18pt;
+            line-height: 1.4;
+            margin: 20px 0;
+        }
+        .bold-val { font-weight: bold; font-size: 22pt; }
+        
+        .signature-area {
+            margin-top: 20mm;
+            border-top: 1.5pt solid #3d1f1c;
+            padding-top: 5px;
+        }
+        .signature-table { width: 100%; color: #2a5a8a; font-style: italic; font-size: 14pt; }
+        .signature-font { font-family: 'Brush Script MT', cursive; font-size: 20pt; }
+        
+        /* Details Section */
+        .details-section {
+            margin-top: 15mm;
+            padding: 8mm 12mm;
+            border: 2pt solid #e4ddd4;
+            background: #faf9f7;
+        }
+        .details-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details-grid td {
+            padding: 4mm 5mm;
+            vertical-align: top;
+        }
+        .detail-label {
+            font-size: 11pt;
+            color: #6b5344;
+            letter-spacing: 0.5pt;
+            margin-bottom: 2mm;
+        }
+        .detail-value {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #3d1f1c;
+        }
+        .branding-section {
+            margin-top: 10mm;
+            text-align: center;
+        }
+        .branding-title {
+            font-size: 24pt;
+            font-weight: bold;
+            letter-spacing: 3pt;
+            color: #3d1f1c;
+        }
+        .branding-tagline {
+            font-size: 10pt;
+            color: #a68966;
+            letter-spacing: 2pt;
+            margin-top: 2mm;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-border">
+        <div class="inner-border">
+            <!-- Header -->
+            <table class="content-table">
+                <tr>
+                    <td class="text-center" style="padding-top: 10mm;">
+                        <span class="header-title">ANDELSBEVIS</span>
+                        <img src="honey_1.png" class="header-bee">
+                    </td>
+                </tr>
+            </table>
+
+            <div class="thick-line"></div>
+            <div class="thin-line"></div>
+
+            <div class="text-center intro-text">Härmed bekräftas att</div>
+            <div class="text-center customer-name">{{ booking.name }}</div>
+            
+            <div class="text-center details-text">
+                har fått <span class="bold-val">{{ booking.quantity }}</span> {% if booking.quantity == 1 %}andel{% else %}andelar{% endif %}<br>
+                av honungsskörden <span class="bold-val">{{ season.year }}</span> i Solberg Honungs bigård
+            </div>
+
+            <!-- Signature Area -->
+            <div class="signature-area">
+                <table class="content-table">
+                    <tr>
+                        <td style="width: 50%; color: #2a5a8a; font-style: italic; font-size: 14pt;">Harbo, {{ current_date }}</td>
+                        <td style="width: 50%; text-align: right; color: #2a5a8a; font-family: 'Brush Script MT', cursive; font-size: 20pt;">Valentin Georgiev</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Details Section -->
+            <div class="details-section">
+                <table class="details-grid">
+                    <tr>
+                        <td style="width: 50%;">
+                            <div class="detail-label">Andelsnummer</div>
+                            <div class="detail-value">{{ season.year[-2:] }}-{{ '%03d' % booking.id }}</div>
+                        </td>
+                        <td style="width: 50%;">
+                            <div class="detail-label">Säsong</div>
+                            <div class="detail-value">{{ season.year }}</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="detail-label">Antal andelar</div>
+                            <div class="detail-value">{{ booking.quantity }}</div>
+                        </td>
+                        <td>
+                            <div class="detail-label">Honungsgaranti (per andel)</div>
+                            <div class="detail-value">~1,5 kg</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Branding -->
+            <div class="branding-section">
+                <div class="branding-title">SOLBERG HONUNG</div>
+                <div class="branding-tagline">HARBO · HÄLSINGLAND</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

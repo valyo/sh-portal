@@ -3,7 +3,7 @@ from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
 import os
-from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id
+from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id, generate_pdf_weasyprint
 from datetime import datetime, timedelta
 from flask_mail import Message
 
@@ -29,7 +29,9 @@ def generate_certificate(booking_id):
     pdf_filename = f"certificate_lamm_{booking.id}.pdf"
     pdf_path = os.path.join(current_app.root_path, '..', 'temp', pdf_filename)
 
-    if generate_invoice_pdf(pdf_html, pdf_path):
+    # Use WeasyPrint for certificates
+    static_folder = os.path.join(current_app.root_path, 'static')
+    if generate_pdf_weasyprint(pdf_html, pdf_path, base_url=static_folder):
         return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_Lamm_{booking.name.replace(' ', '_')}.pdf")
     else:
         return jsonify({'error': 'Failed to generate certificate'}), 500
