@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify
+from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file
 from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
@@ -8,6 +8,31 @@ from datetime import datetime, timedelta
 from flask_mail import Message
 
 lammandel = Blueprint('lammandel', __name__)
+
+@lammandel.route('/lammandel/api/booking/<int:booking_id>/certificate', methods=['GET'])
+def generate_certificate(booking_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    booking = BookingsLamm.query.get_or_404(booking_id)
+    season = booking.season
+
+    # Generate PDF
+    pdf_html = render_template(
+        'certificate_template.html',
+        booking=booking,
+        season=season,
+        current_date=datetime.now().strftime('%Y-%m-%d'),
+        logo_cid='logo'
+    )
+
+    pdf_filename = f"certificate_lamm_{booking.id}.pdf"
+    pdf_path = os.path.join(current_app.root_path, '..', 'temp', pdf_filename)
+
+    if generate_invoice_pdf(pdf_html, pdf_path):
+        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_Lamm_{booking.name.replace(' ', '_')}.pdf")
+    else:
+        return jsonify({'error': 'Failed to generate certificate'}), 500
 
 @lammandel.route('/lammandel/import-bookings', methods=['POST'])
 def import_bookings():

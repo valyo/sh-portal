@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify
+from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file
 from .models import Season, Bookings, Invoice
 from . import db
 import pandas as pd
@@ -9,6 +9,31 @@ from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_d
 from flask_mail import Message
 
 andelsbiodling = Blueprint('andelsbiodling', __name__)
+
+@andelsbiodling.route('/api/booking/<int:booking_id>/certificate', methods=['GET'])
+def generate_certificate(booking_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    booking = Bookings.query.get_or_404(booking_id)
+    season = booking.season
+
+    # Generate PDF
+    pdf_html = render_template(
+        'certificate_template.html',
+        booking=booking,
+        season=season,
+        current_date=datetime.now().strftime('%Y-%m-%d'),
+        logo_cid='logo'
+    )
+
+    pdf_filename = f"certificate_{booking.id}.pdf"
+    pdf_path = os.path.join(current_app.root_path, '..', 'temp', pdf_filename)
+
+    if generate_invoice_pdf(pdf_html, pdf_path):
+        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_{booking.name.replace(' ', '_')}.pdf")
+    else:
+        return jsonify({'error': 'Failed to generate certificate'}), 500
 
 @andelsbiodling.route('/andelsbiodling/import-bookings', methods=['POST'])
 def import_bookings():

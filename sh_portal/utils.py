@@ -53,6 +53,8 @@ def generate_invoice_pdf(html_content, output_path):
         # Convert cid:logo to actual path
         html_content = html_content.replace('cid:logo', os.path.join(static_dir, 'logo.png'))
         html_content = html_content.replace('cid:swish_qr', os.path.join(static_dir, 'swish_qr.png'))
+        html_content = html_content.replace('cid:honey', os.path.join(static_dir, 'honey.png'))
+        html_content = html_content.replace('cid:bee_icon', os.path.join(static_dir, 'bee_icon.png'))
 
         with open(output_path, "wb") as f:
             pisa_status = pisa.CreatePDF(html_content, dest=f)
