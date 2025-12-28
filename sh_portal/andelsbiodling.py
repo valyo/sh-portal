@@ -253,3 +253,26 @@ def send_invoices():
         error_msg = f"Error sending invoices: {str(e)}"
         current_app.logger.error(error_msg)
         return jsonify({'error': error_msg}), 500
+
+@andelsbiodling.route('/api/invoice/<int:invoice_id>/payment', methods=['POST'])
+def update_invoice_payment(invoice_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    invoice = Invoice.query.get_or_404(invoice_id)
+    paid = request.json.get('paid', False)
+
+    try:
+        if paid:
+            invoice.date_payed = datetime.now()
+        else:
+            invoice.date_payed = None
+
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f'Invoice marked as {"paid" if paid else "unpaid"}.'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
