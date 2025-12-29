@@ -73,6 +73,28 @@ A management portal for Solberg Honung, handling beekeeping (Andelsbiodling) and
 └── instance/            # SQLite database storage
 ```
 
+## Development Tools
+
+### PDF Preview Script
+A helper script `develop_pdf.py` is available to preview certificate templates locally without running the full portal. It watches the template files and regenerates a PDF preview instantly on every save.
+
+1. **Create and activate a virtual environment**:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install weasyprint watchdog jinja2
+   ```
+
+3. **Run the preview script**:
+   ```bash
+   python develop_pdf.py
+   ```
+   This will generate `certificate_preview.pdf` in the root directory and update it whenever you change the HTML template.
+
 ## Administration
 
 To create an initial admin user for GitHub OAuth login, you can use the custom Flask command:
