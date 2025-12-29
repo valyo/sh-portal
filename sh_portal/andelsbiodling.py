@@ -34,7 +34,8 @@ def generate_certificate(booking_id):
     static_folder = os.path.join(current_app.root_path, 'static')
     if generate_pdf_weasyprint(pdf_html, pdf_path, base_url=static_folder):
         cert_name = booking.certificate_name if booking.certificate_name else booking.name
-        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_{cert_name.replace(' ', '_')}.pdf")
+        andelsnummer = f"{season.year[-2:]}-{booking.id:03d}"
+        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_{andelsnummer}_{cert_name.replace(' ', '_')}.pdf")
     else:
         return jsonify({'error': 'Failed to generate certificate'}), 500
 
