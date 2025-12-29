@@ -6,26 +6,34 @@ import re
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from weasyprint import HTML
+from jinja2 import Template
 from io import BytesIO
 
-def generate_pdf_weasyprint(html_content, output_path, base_url=None):
+def generate_pdf_weasyprint(template_path, output_path, context, base_url=None):
     """
-    Converts HTML content to a PDF file using WeasyPrint.
+    Renders a template with Jinja2 and converts it to a PDF file using WeasyPrint.
     """
     try:
         # Create the directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # Use WeasyPrint to generate PDF
-        # We specify the encoding to avoid issues with special characters
+        # 1. Read the template file
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+        
+        # 2. Render the template with Jinja2 (direct approach like in development)
+        template = Template(template_content)
+        html_content = template.render(**context)
+
+        # 3. Use WeasyPrint to generate PDF
         html = HTML(string=html_content, base_url=base_url, encoding='utf-8')
         html.write_pdf(target=output_path)
 
-        current_app.logger.info(f"Successfully generated PDF at {output_path} using WeasyPrint")
+        current_app.logger.info(f"Successfully generated PDF at {output_path} using WeasyPrint and Jinja2 Template")
         return True
     except Exception as e:
         import traceback
-        error_msg = f"Error generating PDF with WeasyPrint: {str(e)}\n{traceback.format_exc()}"
+        error_msg = f"Error generating PDF with WeasyPrint/Jinja2: {str(e)}\n{traceback.format_exc()}"
         current_app.logger.error(error_msg)
         return False
 

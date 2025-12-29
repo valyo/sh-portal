@@ -18,20 +18,20 @@ def generate_certificate(booking_id):
     booking = Bookings.query.get_or_404(booking_id)
     season = booking.season
 
-    # Generate PDF
-    pdf_html = render_template(
-        'certificate_pdf_template.html',
-        booking=booking,
-        season=season,
-        current_date=datetime.now().strftime('%Y-%m-%d'),
-        logo_cid='logo'
-    )
+    # Prepare context for template
+    context = {
+        'booking': booking,
+        'season': season,
+        'current_date': datetime.now().strftime('%Y-%m-%d'),
+        'logo_cid': 'logo'
+    }
 
     pdf_filename = f"certificate_{booking.id}.pdf"
     pdf_path = os.path.join(current_app.root_path, '..', 'temp', pdf_filename)
+    template_path = os.path.join(current_app.root_path, 'templates', 'certificate_pdf_template.html')
 
-    # Use WeasyPrint for certificates
-    if generate_pdf_weasyprint(pdf_html, pdf_path, base_url=current_app.root_path):
+    # Use WeasyPrint for certificates with direct Jinja2 rendering
+    if generate_pdf_weasyprint(template_path, pdf_path, context, base_url=current_app.root_path):
         cert_name = booking.certificate_name if booking.certificate_name else booking.name
         andelsnummer = f"{season.year[-2:]}-{booking.id:03d}"
         return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_{andelsnummer}_{cert_name.replace(' ', '_')}.pdf")
