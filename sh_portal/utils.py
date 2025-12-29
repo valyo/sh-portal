@@ -5,7 +5,6 @@ import os
 import re
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from xhtml2pdf import pisa
 from weasyprint import HTML
 from io import BytesIO
 
@@ -21,7 +20,7 @@ def generate_pdf_weasyprint(html_content, output_path, base_url=None):
         # We specify the encoding to avoid issues with special characters
         html = HTML(string=html_content, base_url=base_url, encoding='utf-8')
         html.write_pdf(target=output_path)
-        
+
         current_app.logger.info(f"Successfully generated PDF at {output_path} using WeasyPrint")
         return True
     except Exception as e:
@@ -60,30 +59,33 @@ def get_sheet_data(sheet_id, range_name):
 
 def generate_invoice_pdf(html_content, output_path):
     """
-    Converts HTML content to a PDF file.
+    Converts HTML content to a PDF file using WeasyPrint.
     """
     try:
         # Create the directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         # Replace cid: references with local paths for PDF generation
-        # This is a simple hack since xhtml2pdf doesn't support CIDs
-        # We assume the images are in sh_portal/static/
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         static_dir = os.path.join(base_dir, 'sh_portal', 'static')
 
-        # Convert cid:logo to actual path
-        html_content = html_content.replace('cid:logo', os.path.join(static_dir, 'logo.png'))
-        html_content = html_content.replace('cid:swish_qr', os.path.join(static_dir, 'swish_qr.png'))
-        html_content = html_content.replace('cid:honey', os.path.join(static_dir, 'honey.png'))
-        html_content = html_content.replace('cid:bee_icon', os.path.join(static_dir, 'bee_icon.png'))
+        # WeasyPrint handles paths better if we use file:// prefix for local files
+        static_url = f"file://{static_dir}/"
 
-        with open(output_path, "wb") as f:
-            pisa_status = pisa.CreatePDF(html_content, dest=f)
+        # Convert cid: references to relative paths that WeasyPrint can resolve with base_url
+        html_content = html_content.replace('cid:logo', 'logo.png')
+        html_content = html_content.replace('cid:swish_qr', 'swish_qr.png')
+        html_content = html_content.replace('cid:honey', 'honey.png')
+        html_content = html_content.replace('cid:bee_icon', 'bee_icon.png')
 
-        return not pisa_status.err
+        # Use WeasyPrint to generate PDF
+        html = HTML(string=html_content, base_url=static_url, encoding='utf-8')
+        html.write_pdf(target=output_path)
+
+        current_app.logger.info(f"Successfully generated invoice PDF at {output_path} using WeasyPrint")
+        return True
     except Exception as e:
-        current_app.logger.error(f"Error generating PDF: {str(e)}")
+        current_app.logger.error(f"Error generating invoice PDF with WeasyPrint: {str(e)}")
         return False
 
 def import_bookings_from_sheet(

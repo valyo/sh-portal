@@ -275,6 +275,7 @@ def send_invoices():
         if skipped_count > 0:
             message += f' {skipped_count} invoices already existed and were skipped.'
 
+        flash(message, 'success')
         return jsonify({
             'success': True,
             'message': message,
@@ -301,9 +302,11 @@ def update_invoice_payment(invoice_id):
             invoice.date_payed = None
 
         db.session.commit()
+        message = f'Invoice marked as {"paid" if paid else "unpaid"}.'
+        flash(message, 'success')
         return jsonify({
             'success': True,
-            'message': f'Invoice marked as {"paid" if paid else "unpaid"}.'
+            'message': message
         })
     except Exception as e:
         db.session.rollback()

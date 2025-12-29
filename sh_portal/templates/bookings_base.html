@@ -383,12 +383,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification(data.message);
-
-                // Reload the page when the modal is hidden
-                document.getElementById('notificationModal').addEventListener('hidden.bs.modal', function () {
-                    window.location.reload();
-                }, { once: true });
+                // Just reload the page. The flash message added in the backend will show up.
+                window.location.reload();
             } else {
                 showNotification('Error: ' + (data.error || 'Failed to send invoices'), true);
             }
@@ -465,11 +461,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        showNotification(data.message);
-                        // Reload the page when the notification is closed
-                        document.getElementById('notificationModal').addEventListener('hidden.bs.modal', function () {
-                            window.location.reload();
-                        }, { once: true });
+                        // Just reload the page. The backend doesn't flash here yet, but we could add it.
+                        // For now, reload is better than getting stuck.
+                        window.location.reload();
                     } else {
                         showNotification('Error: ' + (data.error || 'Failed to update payment status'), true);
                     }
