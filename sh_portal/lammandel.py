@@ -19,7 +19,7 @@ def generate_certificate(booking_id):
 
     # Generate PDF
     pdf_html = render_template(
-        'certificate_template.html',
+        'certificate_pdf_template.html',
         booking=booking,
         season=season,
         current_date=datetime.now().strftime('%Y-%m-%d'),
