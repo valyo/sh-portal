@@ -269,6 +269,7 @@ def send_invoices():
                 errors.append(error_msg)
                 continue
 
+        db.session.commit()
         current_app.logger.info(f"Successfully processed {sent_count} invoices, {skipped_count} skipped")
 
         message = f'Invoices created, saved as PDF and sent to {sent_count} recipients.'
