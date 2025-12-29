@@ -33,13 +33,13 @@
         .text-center { text-align: center; }
         
         .header-title {
-            font-size: 38pt;
-            letter-spacing: 5pt;
+            font-size: 33pt;
+            letter-spacing: 3pt;
             margin: 0;
             padding: 0;
             text-transform: uppercase;
         }
-        .header-bee { height: 12mm; vertical-align: middle; margin-left: 10px; }
+        .header-bee { height: 12mm; vertical-align: top; margin-left: 10px; }
         
         .thick-line { height: 4pt; background-color: #3d1f1c; margin: 15px 0 2px 0; }
         .thin-line { height: 1.5pt; background-color: #a68966; margin-bottom: 25px; }
@@ -129,7 +129,7 @@
             <div class="thin-line"></div>
 
             <div class="text-center intro-text">Härmed bekräftas att</div>
-            <div class="text-center customer-name">{{ booking.name }}</div>
+            <div class="text-center customer-name">{{ booking.certificate_name if booking.certificate_name else booking.name }}</div>
             
             <div class="text-center details-text">
                 har fått <span class="bold-val">{{ booking.quantity }}</span> {% if booking.quantity == 1 %}andel{% else %}andelar{% endif %}<br>
@@ -174,8 +174,8 @@
 
             <!-- Branding -->
             <div class="branding-section">
-                <div class="branding-title">SOLBERG HONUNG</div>
-                <div class="branding-tagline">HARBO · HÄLSINGLAND</div>
+                <div class="branding-title">Solberg Honung</div>
+                <div class="branding-tagline">HARBO</div>
             </div>
         </div>
     </div>

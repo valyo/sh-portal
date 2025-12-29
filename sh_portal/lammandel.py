@@ -32,7 +32,8 @@ def generate_certificate(booking_id):
     # Use WeasyPrint for certificates
     static_folder = os.path.join(current_app.root_path, 'static')
     if generate_pdf_weasyprint(pdf_html, pdf_path, base_url=static_folder):
-        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_Lamm_{booking.name.replace(' ', '_')}.pdf")
+        cert_name = booking.certificate_name if booking.certificate_name else booking.name
+        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_Lamm_{cert_name.replace(' ', '_')}.pdf")
     else:
         return jsonify({'error': 'Failed to generate certificate'}), 500
 
@@ -118,7 +119,8 @@ def get_booking(booking_id):
         'postnummer': booking.postnummer,
         'ort': booking.ort,
         'message': booking.message,
-        'quantity': booking.quantity
+        'quantity': booking.quantity,
+        'certificate_name': booking.certificate_name
     })
 
 @lammandel.route('/lammandel/api/booking/<int:booking_id>', methods=['POST'])
@@ -137,8 +139,10 @@ def update_booking(booking_id):
         booking.ort = request.form.get('ort')
         booking.message = request.form.get('message')
         booking.quantity = int(request.form.get('quantity'))
+        booking.certificate_name = request.form.get('certificate_name')
 
         db.session.commit()
+        flash('Booking updated successfully', 'success')
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()

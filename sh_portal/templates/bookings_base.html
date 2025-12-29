@@ -228,10 +228,15 @@
                             <input type="text" class="form-control" id="name" name="name" required>
                         </div>
                         <div class="col-md-6">
+                            <label for="certificate_name" class="form-label">Certificate Name (optional)</label>
+                            <input type="text" class="form-control" id="certificate_name" name="certificate_name" placeholder="Leave empty to use booking name">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
                             <label for="email" class="form-label">Email</label>
                             <input type="email" class="form-control" id="email" name="email" required>
                         </div>
-                    </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="telephone" class="form-label">Telephone</label>
@@ -424,6 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('postnummer').value = data.postnummer;
                     document.getElementById('ort').value = data.ort;
                     document.getElementById('message').value = data.message;
+                    document.getElementById('certificate_name').value = data.certificate_name || '';
 
                     // Show the modal
                     manageBookingModal.show();
@@ -493,13 +499,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                manageBookingModal.hide();
-                showNotification('Booking updated successfully');
-
-                // Reload the page when the notification is closed
-                document.getElementById('notificationModal').addEventListener('hidden.bs.modal', function () {
-                    window.location.reload();
-                }, { once: true });
+                // If the update was successful, just reload the page.
+                // The flash message added in the backend will show up.
+                window.location.reload();
             } else {
                 showNotification('Error updating booking: ' + data.message, true);
             }

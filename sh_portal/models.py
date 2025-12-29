@@ -36,6 +36,7 @@ class Bookings(db.Model):
     ort = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text)
     quantity = db.Column(db.Integer, nullable=False)
+    certificate_name = db.Column(db.String(150), nullable=True)
 
     # Relationship with Season
     season = db.relationship('Season', backref=db.backref('bookings', lazy=True))
@@ -58,6 +59,7 @@ class BookingsLamm(db.Model):
     ort = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text)
     quantity = db.Column(db.Integer, nullable=False)
+    certificate_name = db.Column(db.String(150), nullable=True)
 
     # Relationship with Season
     season = db.relationship('Season', backref=db.backref('bookings_lamm', lazy=True))
