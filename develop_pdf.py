@@ -16,7 +16,7 @@ MOCK_DATA = {
     "booking": {
         "id": 5,
         "name": "Kristina Holmberg",
-        "certificate_name": "KRISTINA HOLMBERG",
+        "certificate_name": "Kristina Holmberg",
         "quantity": 2
     },
     "season": {
