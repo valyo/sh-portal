@@ -112,6 +112,10 @@ def get_booking(booking_id):
         return jsonify({'error': 'Unauthorized'}), 401
 
     booking = Bookings.query.get_or_404(booking_id)
+    # Check if there is a paid invoice for this booking
+    invoice = Invoice.query.filter_by(booking_id=booking.id).first()
+    is_paid = invoice.date_payed is not None if invoice else False
+
     return jsonify({
         'id': booking.id,
         'name': booking.name,
@@ -122,7 +126,8 @@ def get_booking(booking_id):
         'ort': booking.ort,
         'message': booking.message,
         'quantity': booking.quantity,
-        'certificate_name': booking.certificate_name
+        'certificate_name': booking.certificate_name,
+        'is_paid': is_paid
     })
 
 @andelsbiodling.route('/api/booking/<int:booking_id>', methods=['POST'])

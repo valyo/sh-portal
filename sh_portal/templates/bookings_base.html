@@ -427,6 +427,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('message').value = data.message;
                     document.getElementById('certificate_name').value = data.certificate_name || '';
 
+                    // Store the payment status on the button itself
+                    const certBtn = document.getElementById('generateCertificateBtn');
+                    certBtn.dataset.isPaid = data.is_paid;
+
                     // Show the modal
                     manageBookingModal.show();
                 })
@@ -510,6 +514,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('generateCertificateBtn').addEventListener('click', function() {
         const bookingId = document.getElementById('bookingId').value;
         if (!bookingId) return;
+
+        const isPaid = this.dataset.isPaid === 'true';
+        if (!isPaid) {
+            if (!confirm('Warning: This booking has not been marked as paid. Are you sure you want to generate the certificate anyway?')) {
+                return;
+            }
+        }
 
         // Determine the API prefix based on the page title
         const pageTitle = document.querySelector('h1').textContent.trim();
