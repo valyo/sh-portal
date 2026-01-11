@@ -242,9 +242,13 @@
                             <label for="telephone" class="form-label">Telephone</label>
                             <input type="tel" class="form-control" id="telephone" name="telephone" required>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <label for="quantity" class="form-label">Quantity</label>
                             <input type="number" class="form-control" id="quantity" name="quantity" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="certificate_quantity" class="form-label">Cert. Qty (opt)</label>
+                            <input type="number" class="form-control" id="certificate_quantity" name="certificate_quantity" placeholder="Auto">
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -426,6 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('ort').value = data.ort;
                     document.getElementById('message').value = data.message;
                     document.getElementById('certificate_name').value = data.certificate_name || '';
+                    document.getElementById('certificate_quantity').value = data.certificate_quantity || '';
 
                     // Store the payment status on the button itself
                     const certBtn = document.getElementById('generateCertificateBtn');

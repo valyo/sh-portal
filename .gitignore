@@ -50,3 +50,7 @@ Thumbs.db
 
 # Google Sheets credentials
 sh-*.json
+
+# Other
+certificate_preview.pdf
+invoices/

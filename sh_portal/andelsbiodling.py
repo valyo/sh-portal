@@ -126,6 +126,7 @@ def get_booking(booking_id):
         'message': booking.message,
         'quantity': booking.quantity,
         'certificate_name': booking.certificate_name,
+        'certificate_quantity': booking.certificate_quantity,
         'is_paid': is_paid
     })
 
@@ -146,6 +147,8 @@ def update_booking(booking_id):
         booking.message = request.form.get('message')
         booking.quantity = int(request.form.get('quantity'))
         booking.certificate_name = request.form.get('certificate_name')
+        cert_qty = request.form.get('certificate_quantity')
+        booking.certificate_quantity = int(cert_qty) if cert_qty else None
 
         db.session.commit()
         flash('Booking updated successfully', 'success')

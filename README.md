@@ -93,7 +93,7 @@ A helper script `develop_pdf.py` is available to preview certificate templates l
    ```bash
    python develop_pdf.py
    ```
-   This will generate `certificate_preview.pdf` in the root directory and update it whenever you change the HTML template.
+   This will generate `certificate_preview.pdf` in the root directory and update it whenever you change the HTML template sh_portal/templates/certificate_pdf_template.html
 
 ## Administration
 

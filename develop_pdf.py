@@ -17,7 +17,8 @@ MOCK_DATA = {
         "id": 5,
         "name": "Kristina Holmberg",
         "certificate_name": "Kristina Holmberg",
-        "quantity": 2
+        "quantity": 2,
+        "certificate_quantity": 3
     },
     "season": {
         "year": "2025"

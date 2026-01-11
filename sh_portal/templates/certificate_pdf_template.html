@@ -143,7 +143,8 @@
             <div class="text-center customer-name">{{ booking.certificate_name if booking.certificate_name else booking.name }}</div>
             
             <div class="text-center details-text">
-                har fått <span class="bold-val">{{ booking.quantity }}</span> {% if booking.quantity == 1 %}andel{% else %}andelar{% endif %}<br>
+                {% set display_quantity = booking.certificate_quantity if booking.certificate_quantity else booking.quantity %}
+                har fått <span class="bold-val">{{ display_quantity }}</span> {% if display_quantity == 1 %}andel{% else %}andelar{% endif %}<br>
                 av honungsskörden <span class="bold-val">{{ season.year }}</span> i Solberg Honungs bigård
             </div>
 
@@ -173,7 +174,7 @@
                     <tr>
                         <td>
                             <div class="detail-label">Antal andelar</div>
-                            <div class="detail-value">{{ booking.quantity }}</div>
+                            <div class="detail-value">{{ booking.certificate_quantity if booking.certificate_quantity else booking.quantity }}</div>
                         </td>
                         <td>
                             <div class="detail-label">Honungsgaranti (per andel)</div>
