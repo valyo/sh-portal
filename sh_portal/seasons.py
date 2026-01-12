@@ -44,6 +44,29 @@ def update_season(season_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
+@seasons.route('/api/season/<int:season_id>/delete', methods=['POST'])
+def delete_season(season_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    season = Season.query.get_or_404(season_id)
+
+    # Check if there are any bookings or invoices associated with this season
+    if season.bookings or season.bookings_lamm or season.invoices or season.invoices_lamm:
+        return jsonify({
+            'success': False,
+            'message': 'Cannot delete season because it has associated bookings or invoices.'
+        }), 400
+
+    try:
+        db.session.delete(season)
+        db.session.commit()
+        flash(f'Season {season.year} deleted!', 'success')
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 @seasons.route('/seasons/create', methods=['POST'])
 def create_season():
     if not session.get('user'):
@@ -56,7 +79,7 @@ def create_season():
     # Check if season already exists
     existing_season = Season.query.filter_by(year=year).first()
     if existing_season:
-        flash('En säsong med detta år finns redan.', 'error')
+        flash('A season for this year already exists.', 'error')
         return redirect(url_for('seasons.list_seasons'))
     
     # Create new season
@@ -68,5 +91,5 @@ def create_season():
     db.session.add(new_season)
     db.session.commit()
     
-    flash('Ny säsong skapad!', 'success')
+    flash('New season created!', 'success')
     return redirect(url_for('seasons.list_seasons')) 
