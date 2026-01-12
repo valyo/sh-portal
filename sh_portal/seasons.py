@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, request, current_app, flash
+from flask import Blueprint, render_template, redirect, url_for, session, request, current_app, flash, jsonify
 from .models import Season
 from . import db
 
@@ -12,6 +12,61 @@ def list_seasons():
     seasons = Season.query.order_by(Season.year.desc()).all()
     return render_template('seasons.html', seasons=seasons, user=session.get('user'))
 
+@seasons.route('/api/season/<int:season_id>')
+def get_season(season_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    season = Season.query.get_or_404(season_id)
+    return jsonify({
+        'id': season.id,
+        'year': season.year,
+        'price': season.price,
+        'price_lamm': season.price_lamm
+    })
+
+@seasons.route('/api/season/<int:season_id>', methods=['POST'])
+def update_season(season_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    season = Season.query.get_or_404(season_id)
+
+    try:
+        season.year = request.form.get('year')
+        season.price = float(request.form.get('price'))
+        season.price_lamm = float(request.form.get('price_lamm'))
+
+        db.session.commit()
+        flash(f'Säsong {season.year} uppdaterad!', 'success')
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@seasons.route('/api/season/<int:season_id>/delete', methods=['POST'])
+def delete_season(season_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    season = Season.query.get_or_404(season_id)
+
+    # Check if there are any bookings or invoices associated with this season
+    if season.bookings or season.bookings_lamm or season.invoices or season.invoices_lamm:
+        return jsonify({
+            'success': False,
+            'message': 'Cannot delete season because it has associated bookings or invoices.'
+        }), 400
+
+    try:
+        db.session.delete(season)
+        db.session.commit()
+        flash(f'Season {season.year} deleted!', 'success')
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 @seasons.route('/seasons/create', methods=['POST'])
 def create_season():
     if not session.get('user'):
@@ -24,7 +79,7 @@ def create_season():
     # Check if season already exists
     existing_season = Season.query.filter_by(year=year).first()
     if existing_season:
-        flash('En säsong med detta år finns redan.', 'error')
+        flash('A season for this year already exists.', 'error')
         return redirect(url_for('seasons.list_seasons'))
     
     # Create new season
@@ -36,5 +91,5 @@ def create_season():
     db.session.add(new_season)
     db.session.commit()
     
-    flash('Ny säsong skapad!', 'success')
+    flash('New season created!', 'success')
     return redirect(url_for('seasons.list_seasons')) 

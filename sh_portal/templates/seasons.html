@@ -19,6 +19,8 @@
                             <thead>
                                 <tr>
                                     <th>Year</th>
+                                    <th>Price Honey</th>
+                                    <th>Price Lamb</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -27,16 +29,20 @@
                                 {% for season in seasons %}
                                 <tr>
                                     <td>{{ season.year }}</td>
+                                    <td>{{ season.price | int }}</td>
+                                    <td>{{ season.price_lamm | int }}</td>
                                     <td>
                                         <span class="badge bg-success">Active</span>
                                     </td>
                                     <td>
-                                        <a href="#" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-eye"></i> View
-                                        </a>
-                                        <a href="#" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-pencil"></i> Edit
-                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary manage-season"
+                                                data-season-id="{{ season.id }}">
+                                            <i class="bi bi-gear"></i> Manage
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger delete-season"
+                                                data-season-id="{{ season.id }}" data-season-year="{{ season.year }}">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -65,11 +71,11 @@
                         </div>
                         <div class="mb-3">
                             <label for="price" class="form-label">Price Andelsbiodling</label>
-                            <input type="number" step="0.01" class="form-control" id="price" name="price" required>
+                            <input type="number" step="1" class="form-control" id="price" name="price" required>
                         </div>
                         <div class="mb-3">
                             <label for="price_lamm" class="form-label">Price Lammandel</label>
-                            <input type="number" step="0.01" class="form-control" id="price_lamm" name="price_lamm" required>
+                            <input type="number" step="1" class="form-control" id="price_lamm" name="price_lamm" required>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -80,4 +86,181 @@
             </div>
         </div>
     </div>
+
+    <!-- Manage Season Modal -->
+    <div class="modal fade" id="manageSeasonModal" tabindex="-1" aria-labelledby="manageSeasonModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="manageSeasonModalLabel">Manage Season</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="manageSeasonForm" method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" id="seasonId" name="season_id">
+                        <div class="mb-3">
+                            <label for="manage_year" class="form-label">Year</label>
+                            <input type="text" class="form-control" id="manage_year" name="year" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="manage_price" class="form-label">Price Andelsbiodling</label>
+                            <input type="number" step="1" class="form-control" id="manage_price" name="price" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="manage_price_lamm" class="form-label">Price Lammandel</label>
+                            <input type="number" step="1" class="form-control" id="manage_price_lamm" name="price_lamm" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the season <span id="deleteSeasonYearDisplay" class="fw-bold"></span>?
+                    <p class="text-danger mt-2 small">This action cannot be undone and will only work if there are no bookings or invoices associated with it.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Season</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notificationModalLabel">Notification</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="notificationMessage">
+                    <!-- Message will be inserted here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const manageSeasonModal = new bootstrap.Modal(document.getElementById('manageSeasonModal'));
+        const manageSeasonForm = document.getElementById('manageSeasonForm');
+        const confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+        const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
+        const notificationMessage = document.getElementById('notificationMessage');
+        const notificationModalLabel = document.getElementById('notificationModalLabel');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+        let seasonToDeleteId = null;
+
+        function showNotification(message, isError = false) {
+            notificationMessage.textContent = message;
+            notificationModalLabel.textContent = isError ? 'Error' : 'Notification';
+            notificationModalLabel.className = isError ? 'modal-title text-danger' : 'modal-title text-success';
+            notificationModal.show();
+        }
+
+        // Individual manage season buttons
+        document.querySelectorAll('.manage-season').forEach(button => {
+            button.addEventListener('click', function() {
+                const seasonId = this.dataset.seasonId;
+
+                // Fetch full season details
+                fetch(`/api/season/${seasonId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('seasonId').value = data.id;
+                        document.getElementById('manage_year').value = data.year;
+                        document.getElementById('manage_price').value = data.price;
+                        document.getElementById('manage_price_lamm').value = data.price_lamm;
+
+                        // Show the modal
+                        manageSeasonModal.show();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching season details:', error);
+                        showNotification('Error loading season details', true);
+                    });
+            });
+        });
+
+        // Handle form submission
+        manageSeasonForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const seasonId = formData.get('season_id');
+
+            fetch(`/api/season/${seasonId}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Just reload the page. The flash message added in the backend will show up.
+                    window.location.reload();
+                } else {
+                    showNotification('Error updating season: ' + data.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating season:', error);
+                showNotification('Error updating season', true);
+            });
+        });
+
+        // Individual delete season buttons
+        document.querySelectorAll('.delete-season').forEach(button => {
+            button.addEventListener('click', function() {
+                seasonToDeleteId = this.dataset.seasonId;
+                const seasonYear = this.dataset.seasonYear;
+                document.getElementById('deleteSeasonYearDisplay').textContent = seasonYear;
+                confirmDeleteModal.show();
+            });
+        });
+
+        // Confirm delete button handler
+        confirmDeleteBtn.addEventListener('click', function() {
+            if (!seasonToDeleteId) return;
+
+            fetch(`/api/season/${seasonToDeleteId}/delete`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                confirmDeleteModal.hide();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    showNotification(data.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting season:', error);
+                confirmDeleteModal.hide();
+                showNotification('Error deleting season', true);
+            })
+            .finally(() => {
+                seasonToDeleteId = null;
+            });
+        });
+    });
+    </script>
 {% endblock %} 
