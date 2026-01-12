@@ -20,7 +20,7 @@ services:
       - mailcatcher
 
   mailcatcher:
-    image: sj26/mailcatcher
+    image: sj26/mailcatcher:v0.10.0
     ports:
       - "1025:1025"  # SMTP port
       - "1088:1080"  # Web interface
