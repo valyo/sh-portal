@@ -77,6 +77,26 @@
                             <label for="price_lamm" class="form-label">Price Lammandel</label>
                             <input type="number" step="1" class="form-control" id="price_lamm" name="price_lamm" required>
                         </div>
+                        <hr>
+                        <h6>Andelsbiodling (Honey)</h6>
+                        <div class="mb-3">
+                            <label for="google_sheets_link_honey" class="form-label">Google Sheets Link (Honey)</label>
+                            <input type="url" class="form-control" id="google_sheets_link_honey" name="google_sheets_link_honey" placeholder="https://docs.google.com/spreadsheets/d/...">
+                        </div>
+                        <div class="mb-3">
+                            <label for="sheet_range_honey" class="form-label">Sheet Range (Honey)</label>
+                            <input type="text" class="form-control" id="sheet_range_honey" name="sheet_range_honey" placeholder="Sheet1!A1:Z100">
+                        </div>
+                        <hr>
+                        <h6>Lammandel (Lamb)</h6>
+                        <div class="mb-3">
+                            <label for="google_sheets_link_lamm" class="form-label">Google Sheets Link (Lamb)</label>
+                            <input type="url" class="form-control" id="google_sheets_link_lamm" name="google_sheets_link_lamm" placeholder="https://docs.google.com/spreadsheets/d/...">
+                        </div>
+                        <div class="mb-3">
+                            <label for="sheet_range_lamm" class="form-label">Sheet Range (Lamb)</label>
+                            <input type="text" class="form-control" id="sheet_range_lamm" name="sheet_range_lamm" placeholder="Sheet1!A1:Z100">
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -109,6 +129,26 @@
                         <div class="mb-3">
                             <label for="manage_price_lamm" class="form-label">Price Lammandel</label>
                             <input type="number" step="1" class="form-control" id="manage_price_lamm" name="price_lamm" required>
+                        </div>
+                        <hr>
+                        <h6>Andelsbiodling (Honey)</h6>
+                        <div class="mb-3">
+                            <label for="manage_google_sheets_link_honey" class="form-label">Google Sheets Link (Honey)</label>
+                            <input type="url" class="form-control" id="manage_google_sheets_link_honey" name="google_sheets_link_honey">
+                        </div>
+                        <div class="mb-3">
+                            <label for="manage_sheet_range_honey" class="form-label">Sheet Range (Honey)</label>
+                            <input type="text" class="form-control" id="manage_sheet_range_honey" name="sheet_range_honey">
+                        </div>
+                        <hr>
+                        <h6>Lammandel (Lamb)</h6>
+                        <div class="mb-3">
+                            <label for="manage_google_sheets_link_lamm" class="form-label">Google Sheets Link (Lamb)</label>
+                            <input type="url" class="form-control" id="manage_google_sheets_link_lamm" name="google_sheets_link_lamm">
+                        </div>
+                        <div class="mb-3">
+                            <label for="manage_sheet_range_lamm" class="form-label">Sheet Range (Lamb)</label>
+                            <input type="text" class="form-control" id="manage_sheet_range_lamm" name="sheet_range_lamm">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -190,6 +230,10 @@
                         document.getElementById('manage_year').value = data.year;
                         document.getElementById('manage_price').value = data.price;
                         document.getElementById('manage_price_lamm').value = data.price_lamm;
+                        document.getElementById('manage_google_sheets_link_honey').value = data.google_sheets_link_honey || '';
+                        document.getElementById('manage_sheet_range_honey').value = data.sheet_range_honey || '';
+                        document.getElementById('manage_google_sheets_link_lamm').value = data.google_sheets_link_lamm || '';
+                        document.getElementById('manage_sheet_range_lamm').value = data.sheet_range_lamm || '';
 
                         // Show the modal
                         manageSeasonModal.show();
