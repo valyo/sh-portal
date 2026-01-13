@@ -42,20 +42,25 @@ def import_bookings():
     if not session.get('user'):
         return redirect(url_for('main.home'))
 
+    season_id = request.form.get('season_id')
+    if not season_id:
+        flash('Season ID is required.', 'error')
+        return redirect(url_for('lammandel.index'))
+
+    season = Season.query.get_or_404(season_id)
+    sheet_link = season.google_sheets_link_lamm
+    range_name = season.sheet_range_lamm
+
+    if not sheet_link or not range_name:
+        flash('Google Sheet link and range are not configured for this season.', 'error')
+        return redirect(url_for('lammandel.index', season_id=season_id))
+
     try:
-        season_id = request.form.get('season_id')
-        sheet_link = request.form.get('sheet_link')
-        range_name = request.form.get('range_name', 'Form Responses 1!A2:I')
-        if not season_id or not sheet_link or not range_name:
-            flash('Season, Google Sheet link and range are required.', 'error')
-            return redirect(url_for('lammandel.index'))
-
         sheet_id = extract_sheet_id(sheet_link)
-
         data = get_sheet_data(sheet_id, range_name)
         if not data:
             flash('The Google Sheet range is empty or no data was found.', 'error')
-            return redirect(url_for('lammandel.index'))
+            return redirect(url_for('lammandel.index', season_id=season_id))
 
         success = import_bookings_from_sheet(
             db=db,
@@ -63,6 +68,7 @@ def import_bookings():
             season_id=season_id,
             sheet_data=data
         )
+        flash(f'Successfully imported bookings from Google Sheet.', 'success')
         return redirect(url_for('lammandel.index', season_id=season_id))
     except Exception as e:
         db.session.rollback()
