@@ -8,6 +8,10 @@ class Season(db.Model):
     year = db.Column(db.String(10))
     price = db.Column(db.Float, nullable=True)
     price_lamm = db.Column(db.Float, nullable=True)
+    google_sheets_link_honey = db.Column(db.String(500), nullable=True)
+    sheet_range_honey = db.Column(db.String(100), nullable=True)
+    google_sheets_link_lamm = db.Column(db.String(500), nullable=True)
+    sheet_range_lamm = db.Column(db.String(100), nullable=True)
     
     def __repr__(self):
         return f'<Season {self.year}>'

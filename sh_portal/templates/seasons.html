@@ -64,18 +64,46 @@
                 </div>
                 <form action="{{ url_for('seasons.create_season') }}" method="POST">
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="year" class="form-label">Year</label>
+                        <div class="mb-4">
+                            <label for="year" class="form-label fw-bold">Year</label>
                             <input type="text" class="form-control" id="year" name="year" required>
                             <div class="form-text">Enter the year for the new season (e.g. 2024)</div>
                         </div>
-                        <div class="mb-3">
-                            <label for="price" class="form-label">Price Andelsbiodling</label>
-                            <input type="number" step="1" class="form-control" id="price" name="price" required>
+
+                        <div class="card mb-3 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title fw-bold">Andelsbiodling (Honey)</h6>
+                                <div class="mb-3">
+                                    <label for="price" class="form-label">Price</label>
+                                    <input type="number" step="1" class="form-control" id="price" name="price" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="google_sheets_link_honey" class="form-label">Google Sheets Link</label>
+                                    <input type="url" class="form-control" id="google_sheets_link_honey" name="google_sheets_link_honey" placeholder="https://docs.google.com/spreadsheets/d/...">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="sheet_range_honey" class="form-label">Sheet Range</label>
+                                    <input type="text" class="form-control" id="sheet_range_honey" name="sheet_range_honey" placeholder="Sheet1!A1:Z100">
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="price_lamm" class="form-label">Price Lammandel</label>
-                            <input type="number" step="1" class="form-control" id="price_lamm" name="price_lamm" required>
+
+                        <div class="card mb-3 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title fw-bold">Lammandel (Lamb)</h6>
+                                <div class="mb-3">
+                                    <label for="price_lamm" class="form-label">Price</label>
+                                    <input type="number" step="1" class="form-control" id="price_lamm" name="price_lamm" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="google_sheets_link_lamm" class="form-label">Google Sheets Link</label>
+                                    <input type="url" class="form-control" id="google_sheets_link_lamm" name="google_sheets_link_lamm" placeholder="https://docs.google.com/spreadsheets/d/...">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="sheet_range_lamm" class="form-label">Sheet Range</label>
+                                    <input type="text" class="form-control" id="sheet_range_lamm" name="sheet_range_lamm" placeholder="Sheet1!A1:Z100">
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -98,17 +126,45 @@
                 <form id="manageSeasonForm" method="POST">
                     <div class="modal-body">
                         <input type="hidden" id="seasonId" name="season_id">
-                        <div class="mb-3">
-                            <label for="manage_year" class="form-label">Year</label>
+                        <div class="mb-4">
+                            <label for="manage_year" class="form-label fw-bold">Year</label>
                             <input type="text" class="form-control" id="manage_year" name="year" required>
                         </div>
-                        <div class="mb-3">
-                            <label for="manage_price" class="form-label">Price Andelsbiodling</label>
-                            <input type="number" step="1" class="form-control" id="manage_price" name="price" required>
+
+                        <div class="card mb-3 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title fw-bold">Andelsbiodling (Honey)</h6>
+                                <div class="mb-3">
+                                    <label for="manage_price" class="form-label">Price</label>
+                                    <input type="number" step="1" class="form-control" id="manage_price" name="price" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="manage_google_sheets_link_honey" class="form-label">Google Sheets Link</label>
+                                    <input type="url" class="form-control" id="manage_google_sheets_link_honey" name="google_sheets_link_honey">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="manage_sheet_range_honey" class="form-label">Sheet Range</label>
+                                    <input type="text" class="form-control" id="manage_sheet_range_honey" name="sheet_range_honey">
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="manage_price_lamm" class="form-label">Price Lammandel</label>
-                            <input type="number" step="1" class="form-control" id="manage_price_lamm" name="price_lamm" required>
+
+                        <div class="card mb-3 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title fw-bold">Lammandel (Lamb)</h6>
+                                <div class="mb-3">
+                                    <label for="manage_price_lamm" class="form-label">Price</label>
+                                    <input type="number" step="1" class="form-control" id="manage_price_lamm" name="price_lamm" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="manage_google_sheets_link_lamm" class="form-label">Google Sheets Link</label>
+                                    <input type="url" class="form-control" id="manage_google_sheets_link_lamm" name="google_sheets_link_lamm">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="manage_sheet_range_lamm" class="form-label">Sheet Range</label>
+                                    <input type="text" class="form-control" id="manage_sheet_range_lamm" name="sheet_range_lamm">
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -190,6 +246,10 @@
                         document.getElementById('manage_year').value = data.year;
                         document.getElementById('manage_price').value = data.price;
                         document.getElementById('manage_price_lamm').value = data.price_lamm;
+                        document.getElementById('manage_google_sheets_link_honey').value = data.google_sheets_link_honey || '';
+                        document.getElementById('manage_sheet_range_honey').value = data.sheet_range_honey || '';
+                        document.getElementById('manage_google_sheets_link_lamm').value = data.google_sheets_link_lamm || '';
+                        document.getElementById('manage_sheet_range_lamm').value = data.sheet_range_lamm || '';
 
                         // Show the modal
                         manageSeasonModal.show();

@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
         print("Creating migration script...")
         try:
-            migrate_fn(message="add_certificate_name")
+            migrate_fn(message="add_google_sheets_fields")
         except Exception as e:
             # This might fail if there are no changes to detect, which is fine
             print(f"Migration generation info: {e}")
