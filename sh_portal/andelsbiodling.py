@@ -307,20 +307,19 @@ def update_invoice_payment(invoice_id):
         return jsonify({'error': 'Unauthorized'}), 401
 
     invoice = Invoice.query.get_or_404(invoice_id)
-    paid = request.json.get('paid', False)
+    date_paid = request.json.get('date_paid')
 
     try:
-        if paid:
-            invoice.date_payed = datetime.now()
+        if date_paid:
+            invoice.date_payed = datetime.strptime(date_paid, '%Y-%m-%d')
         else:
             invoice.date_payed = None
 
         db.session.commit()
-        message = f'Invoice marked as {"paid" if paid else "unpaid"}.'
-        flash(message, 'success')
+        flash('Invoice updated.', 'success')
         return jsonify({
             'success': True,
-            'message': message
+            'message': 'Invoice updated'
         })
     except Exception as e:
         db.session.rollback()
