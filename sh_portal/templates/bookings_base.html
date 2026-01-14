@@ -174,7 +174,6 @@
                                             <th>Date Paid</th>
                                             <th>Quantity</th>
                                             <th>Total Sum</th>
-                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -187,19 +186,6 @@
                                             <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
                                             <td>{{ invoice.booking.quantity }}</td>
                                             <td>{{ invoice.tot_sum }}</td>
-                                            <td>
-                                                {% if not invoice.date_payed %}
-                                                    <button type="button" class="btn btn-sm btn-outline-success mark-paid"
-                                                            data-invoice-id="{{ invoice.id }}">
-                                                        <i class="bi bi-check-circle"></i> Mark as Paid
-                                                    </button>
-                                                {% else %}
-                                                    <button type="button" class="btn btn-sm btn-outline-danger unmark-paid"
-                                                            data-invoice-id="{{ invoice.id }}">
-                                                        <i class="bi bi-x-circle"></i> Unmark
-                                                    </button>
-                                                {% endif %}
-                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -486,44 +472,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Error fetching booking details:', error);
                     showNotification('Error loading booking details', true);
                 });
-        });
-    });
-
-    // Mark as paid button handler
-    document.querySelectorAll('.mark-paid, .unmark-paid').forEach(button => {
-        button.addEventListener('click', function() {
-            const invoiceId = this.dataset.invoiceId;
-            const isMarking = this.classList.contains('mark-paid');
-            const action = isMarking ? 'mark' : 'unmark';
-
-            // Determine the API prefix based on the page title
-            const pageTitle = document.querySelector('h1').textContent.trim();
-            const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
-
-            if (confirm(`Are you sure you want to ${isMarking ? 'mark this invoice as paid' : 'unmark this invoice as paid'}?`)) {
-                fetch(`${apiPrefix}/api/invoice/${invoiceId}/payment`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        paid: isMarking
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Reload and stay on the invoices tab
-                        reloadWithSeason('invoices');
-                    } else {
-                        showNotification('Error: ' + (data.error || 'Failed to update payment status'), true);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showNotification('Error updating payment status', true);
-                });
-            }
         });
     });
 
