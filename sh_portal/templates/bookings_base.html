@@ -321,11 +321,43 @@ document.addEventListener('DOMContentLoaded', function() {
     const notificationMessage = document.getElementById('notificationMessage');
     const notificationModalLabel = document.getElementById('notificationModalLabel');
 
+    // Restore active tab from URL hash
+    if (window.location.hash === '#invoices') {
+        const invoicesTab = document.getElementById('invoices-tab');
+        if (invoicesTab) {
+            const tab = new bootstrap.Tab(invoicesTab);
+            tab.show();
+        }
+    }
+
+    // Update URL hash when switching tabs
+    document.querySelectorAll('#myTab button[data-bs-toggle="tab"]').forEach(tabButton => {
+        tabButton.addEventListener('shown.bs.tab', function(event) {
+            const targetId = event.target.getAttribute('data-bs-target');
+            if (targetId === '#invoices') {
+                window.location.hash = 'invoices';
+            } else {
+                // Clear hash for bookings tab
+                history.replaceState(null, null, window.location.pathname + window.location.search);
+            }
+        });
+    });
+
     function showNotification(message, isError = false) {
         notificationMessage.textContent = message;
         notificationModalLabel.textContent = isError ? 'Error' : 'Notification';
         notificationModalLabel.className = isError ? 'modal-title text-danger' : 'modal-title text-success';
         notificationModal.show();
+    }
+
+    // Helper function to reload while preserving season selection
+    function reloadWithSeason(hash) {
+        if (hash) {
+            window.location.hash = hash;
+        }
+        // Submit the season form to reload with the current season
+        const seasonForm = document.getElementById('season_id').closest('form');
+        seasonForm.submit();
     }
 
     // Replace window.alert with custom modal for this page logic
@@ -398,8 +430,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Just reload the page. The flash message added in the backend will show up.
-                window.location.reload();
+                // Reload preserving the season selection
+                reloadWithSeason();
             } else {
                 showNotification('Error: ' + (data.error || 'Failed to send invoices'), true);
             }
@@ -481,9 +513,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Just reload the page. The backend doesn't flash here yet, but we could add it.
-                        // For now, reload is better than getting stuck.
-                        window.location.reload();
+                        // Reload and stay on the invoices tab
+                        reloadWithSeason('invoices');
                     } else {
                         showNotification('Error: ' + (data.error || 'Failed to update payment status'), true);
                     }
@@ -513,9 +544,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // If the update was successful, just reload the page.
-                // The flash message added in the backend will show up.
-                window.location.reload();
+                // Reload preserving the season selection
+                reloadWithSeason();
             } else {
                 showNotification('Error updating booking: ' + data.message, true);
             }
