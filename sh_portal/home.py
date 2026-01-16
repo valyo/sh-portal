@@ -8,7 +8,7 @@ main = Blueprint('main', __name__)
 def get_oauth():
     return OAuth2Session(
         client_id=current_app.config['GITHUB_CLIENT_ID'],
-        redirect_uri='http://localhost:8087/callback',
+        redirect_uri=current_app.config['OAUTH_REDIRECT_URI'],
         scope=['user:email']
     )
 

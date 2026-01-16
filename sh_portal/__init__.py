@@ -43,6 +43,7 @@ def create_app():
     app.config['GITHUB_AUTHORIZE_URL'] = GITHUB_AUTHORIZE_URL
     app.config['GITHUB_TOKEN_URL'] = GITHUB_TOKEN_URL
     app.config['GITHUB_API_URL'] = GITHUB_API_URL
+    app.config['OAUTH_REDIRECT_URI'] = os.getenv('OAUTH_REDIRECT_URI', 'http://localhost:8087/callback')
     app.config['GOOGLE_SHEET_ID'] = os.getenv('GOOGLE_SHEET_ID')
 
     # Mail configuration
