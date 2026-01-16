@@ -27,7 +27,7 @@ def generate_certificate(booking_id):
     }
 
     pdf_filename = f"certificate_{booking.id}.pdf"
-    pdf_path = os.path.join(current_app.root_path, '..', 'temp', pdf_filename)
+    pdf_path = os.path.join(current_app.root_path, '..', 'certificates', pdf_filename)
     template_path = os.path.join(current_app.root_path, 'templates', 'certificate_pdf_template.html')
 
     # Use WeasyPrint for certificates with direct Jinja2 rendering
