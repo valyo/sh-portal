@@ -53,7 +53,7 @@ def get_sheet_data(sheet_id, range_name):
     # Use service account credentials
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     credentials = service_account.Credentials.from_service_account_file(
-        'sh-web-portal-f370fff1378a.json',
+        'service-account.json',
         scopes=SCOPES
     )
     service = build('sheets', 'v4', credentials=credentials)
