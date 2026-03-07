@@ -85,4 +85,14 @@ def create_app():
     app.register_blueprint(andelsbiodling)
     app.register_blueprint(lammandel)
 
+    @app.context_processor
+    def inject_version():
+        version_path = os.path.join(os.path.dirname(__file__), '..', 'VERSION')
+        try:
+            with open(version_path) as f:
+                version = f.read().strip() or 'dev'
+        except OSError:
+            version = 'dev'
+        return {'app_version': version}
+
     return app

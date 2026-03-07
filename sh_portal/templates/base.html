@@ -31,7 +31,7 @@
                             <a class="nav-link" href="/lammandel">Lammandel</a>
                         </li>
                     </ul>
-                    <div class="navbar-nav">
+                    <div class="navbar-nav align-items-center">
                         <div class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                 <img src="{{ user.avatar_url }}" alt="Profile" class="rounded-circle" style="width: 24px; height: 24px;">
@@ -41,13 +41,15 @@
                                 <li><a class="dropdown-item" href="/logout">Logout</a></li>
                             </ul>
                         </div>
+                        <span class="nav-link text-muted small ms-3">v{{ app_version }}</span>
                     </div>
                 </div>
             {% else %}
-                <div class="navbar-nav">
+                <div class="navbar-nav align-items-center">
                     <a class="nav-link" href="/login">
                         <i class="bi bi-github"></i> Login with GitHub
                     </a>
+                    <span class="nav-link text-muted small ms-3">v{{ app_version }}</span>
                 </div>
             {% endif %}
         </div>
