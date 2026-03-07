@@ -13,5 +13,5 @@ google-auth-oauthlib==1.2.0
 pandas==2.2.1
 weasyprint==68.0
 pydyf==0.11.0
-tinycss2==1.4.0
+tinycss2>=1.5.0
 cssselect2==0.7.0
