@@ -48,12 +48,14 @@ def extract_sheet_id(sheet_link):
 
 def get_sheet_data(sheet_id, range_name):
     """
-    Fetch data from Google Sheet using service account
+    Fetch data from Google Sheet using service account.
+    Uses GOOGLE_APPLICATION_CREDENTIALS when set (e.g. in deployment);
+    otherwise falls back to service-account.json in the current directory.
     """
-    # Use service account credentials
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    creds_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', 'service-account.json')
     credentials = service_account.Credentials.from_service_account_file(
-        'sh-web-portal-f370fff1378a.json',
+        creds_path,
         scopes=SCOPES
     )
     service = build('sheets', 'v4', credentials=credentials)

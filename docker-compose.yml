@@ -10,6 +10,8 @@ services:
       - .env
     environment:
       - FLASK_APP=main.py
+      # Use same credential path pattern as production (project root = /app in container)
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
       - MAIL_SERVER=mailcatcher
       - MAIL_PORT=1025
       - MAIL_USE_TLS=False
