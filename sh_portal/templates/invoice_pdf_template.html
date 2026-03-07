@@ -251,7 +251,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andel Av Honungsskörden ' ~ invoice.season.year if invoice.season else '' }}</td>
+                        <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andel av honungsskörden ' ~ invoice.season.year if invoice.season else '' }}</td>
                         <td>{{ invoice.quantity }}</td>
                         <td>{{ "%.2f"|format(invoice.season.price_lamm if 'LAMM' in invoice.invoice_id and invoice.season else invoice.season.price if invoice.season else 0) }} kr</td>
                         <td>12%</td>
