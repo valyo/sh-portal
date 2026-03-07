@@ -42,6 +42,10 @@ A management portal for Solberg Honung, handling beekeeping (Andelsbiodling) and
    ```bash
    docker-compose up --build
    ```
+   After changing `requirements.txt` (e.g. bumping Flask), rebuild the image so new dependencies are installed:
+   ```bash
+   docker-compose build --no-cache backend && docker-compose up
+   ```
 
 4. **Access the application**:
    - Web Portal: [http://localhost:8087](http://localhost:8087)
