@@ -10,6 +10,82 @@ from weasyprint import HTML
 from jinja2 import Template
 from io import BytesIO
 
+def apply_mail_backend(app, backend):
+    """Set app mail config for the given backend ('mailcatcher' or 'google'). Used for runtime switch from navbar."""
+    b = (backend or 'mailcatcher').lower()
+    if b == 'google':
+        app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+        app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+        app.config['MAIL_USE_TLS'] = True
+        app.config['MAIL_USE_SSL'] = False
+        app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+        app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+    else:
+        app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'mailcatcher')
+        app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 1025))
+        app.config['MAIL_USE_TLS'] = False
+        app.config['MAIL_USE_SSL'] = False
+        app.config['MAIL_USERNAME'] = ''
+        app.config['MAIL_PASSWORD'] = ''
+
+
+def send_mail_using_current_config(app, msg):
+    """
+    Send message via smtplib using app's current mail config (must call apply_mail_backend first).
+    Flask-Mail reads server/port at init time, so we bypass it and send with the config we just set.
+    """
+    import smtplib
+    server = app.config['MAIL_SERVER']
+    port = int(app.config['MAIL_PORT'])
+    use_tls = app.config.get('MAIL_USE_TLS', False)
+    use_ssl = app.config.get('MAIL_USE_SSL', False)
+    username = app.config.get('MAIL_USERNAME') or ''
+    password = app.config.get('MAIL_PASSWORD') or ''
+    from_addr = msg.sender
+    to_addrs = list(msg.recipients) + list(getattr(msg, 'bcc', []) or []) + list(getattr(msg, 'cc', []) or [])
+    to_addrs = [a for a in to_addrs if a]
+    if not to_addrs:
+        return
+    # Use the same MIME the Message builds (as_bytes in Py3, as_string in Py2)
+    try:
+        payload = msg.as_bytes()
+    except AttributeError:
+        payload = (msg.as_string() if hasattr(msg, 'as_string') else str(msg)).encode(getattr(msg, 'charset', 'utf-8') or 'utf-8')
+    if use_ssl:
+        smtp = smtplib.SMTP_SSL(server, port)
+    else:
+        smtp = smtplib.SMTP(server, port)
+    if use_tls and not use_ssl:
+        smtp.starttls()
+    if username and password:
+        smtp.login(username, password)
+    smtp.sendmail(from_addr, to_addrs, payload)
+    smtp.quit()
+
+
+def get_effective_mail_backend(app):
+    """Return the mail backend to use: cookie (navbar) > session > app config (from env)."""
+    backend, _ = get_effective_mail_backend_with_source(app)
+    return backend
+
+
+def get_effective_mail_backend_with_source(app):
+    """
+    Return (backend, source) so you know what will actually be used.
+    - backend: 'mailcatcher' or 'google'
+    - source: 'cookie' (navbar choice), 'session', or 'config' (env MAIL_BACKEND)
+    """
+    from flask import request, session
+    cookie_val = request.cookies.get('mail_backend', '').strip().lower() if request else ''
+    if cookie_val in ('mailcatcher', 'google'):
+        return cookie_val, 'cookie'
+    session_val = session.get('mail_backend')
+    if session_val in ('mailcatcher', 'google'):
+        return session_val, 'session'
+    config_val = app.config.get('MAIL_BACKEND', 'mailcatcher')
+    return (config_val if config_val in ('mailcatcher', 'google') else 'mailcatcher', 'config')
+
+
 def format_exception_location(exc):
     """Return a string like 'andelsbiodling.py:274 in send_invoices' for the frame where the exception was raised."""
     if getattr(exc, '__traceback__', None) is None:

@@ -33,6 +33,15 @@
                     </ul>
                     <div class="navbar-nav align-items-center">
                         <div class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle py-1" href="#" id="mailBackendDropdown" role="button" data-bs-toggle="dropdown" title="Mail server for sending (from {{ mail_backend_source }}: {% if mail_backend == 'google' %}Google SMTP{% else %}Mailcatcher{% endif %})">
+                                <i class="bi bi-envelope"></i> <span id="mail-backend-label">{% if mail_backend == 'google' %}Google SMTP{% else %}Mailcatcher{% endif %}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mailBackendDropdown">
+                                <li><a class="dropdown-item mail-backend-option {% if mail_backend == 'mailcatcher' %}active{% endif %}" href="#" data-backend="mailcatcher">Mailcatcher</a></li>
+                                <li><a class="dropdown-item mail-backend-option {% if mail_backend == 'google' %}active{% endif %}" href="#" data-backend="google">Google SMTP</a></li>
+                            </ul>
+                        </div>
+                        <div class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                 <img src="{{ user.avatar_url }}" alt="Profile" class="rounded-circle" style="width: 24px; height: 24px;">
                                 {{ user.username }}
@@ -71,5 +80,29 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% if user %}
+    <script>
+    document.querySelectorAll('.mail-backend-option').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            var backend = this.getAttribute('data-backend');
+            fetch('{{ url_for("main.mail_backend") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ backend: backend }),
+                credentials: 'same-origin'
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                if (data.success || data.mail_backend) {
+                    var label = (data.mail_backend || backend) === 'google' ? 'Google SMTP' : 'Mailcatcher';
+                    document.getElementById('mail-backend-label').textContent = label;
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to set mail backend');
+                }
+            }).catch(function() { alert('Failed to set mail backend'); });
+        });
+    });
+    </script>
+    {% endif %}
 </body>
 </html> 
