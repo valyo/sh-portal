@@ -46,14 +46,25 @@ def create_app():
     app.config['OAUTH_REDIRECT_URI'] = os.getenv('OAUTH_REDIRECT_URI', 'http://localhost:8087/callback')
     app.config['GOOGLE_SHEET_ID'] = os.getenv('GOOGLE_SHEET_ID')
 
-    # Mail configuration
-    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'mailcatcher')
-    app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 1025))
-    app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'False').lower() == 'true'
-    app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', 'False').lower() == 'true'
-    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
-    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+    # Mail configuration: MAIL_BACKEND=mailcatcher (default) or google
+    mail_backend = os.getenv('MAIL_BACKEND', 'mailcatcher').lower()
+    if mail_backend == 'google':
+        app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+        app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+        app.config['MAIL_USE_TLS'] = True
+        app.config['MAIL_USE_SSL'] = False
+        app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+        app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+    else:
+        # mailcatcher (default): local catch-all, no auth (ignore credentials in .env)
+        app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'mailcatcher')
+        app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 1025))
+        app.config['MAIL_USE_TLS'] = False
+        app.config['MAIL_USE_SSL'] = False
+        app.config['MAIL_USERNAME'] = ''
+        app.config['MAIL_PASSWORD'] = ''
     app.config['MAIL_DEBUG'] = False
+    app.config['MAIL_BACKEND'] = mail_backend  # for templates/debug if needed
 
     # Initialize database and migrations
     db.init_app(app)
