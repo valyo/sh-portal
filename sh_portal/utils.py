@@ -3,11 +3,99 @@ from flask import current_app, flash
 import pandas as pd
 import os
 import re
+import traceback
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from weasyprint import HTML
 from jinja2 import Template
 from io import BytesIO
+
+def get_mail_connection_params(backend):
+    """
+    Return SMTP connection params for the given backend. Does not touch app.config.
+    Returns dict: server, port, use_tls, use_ssl, username, password.
+    """
+    b = (backend or 'mailcatcher').lower()
+    if b == 'google':
+        return {
+            'server': os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
+            'port': int(os.getenv('MAIL_PORT', 587)),
+            'use_tls': True,
+            'use_ssl': False,
+            'username': os.getenv('MAIL_USERNAME', ''),
+            'password': os.getenv('MAIL_PASSWORD', ''),
+        }
+    return {
+        'server': os.getenv('MAIL_SERVER', 'mailcatcher'),
+        'port': int(os.getenv('MAIL_PORT', 1025)),
+        'use_tls': False,
+        'use_ssl': False,
+        'username': '',
+        'password': '',
+    }
+
+
+def get_effective_mail_backend(app):
+    """Return the mail backend to use: cookie (navbar) > env MAIL_BACKEND."""
+    backend, _ = get_effective_mail_backend_with_source(app)
+    return backend
+
+
+def get_effective_mail_backend_with_source(app):
+    """
+    Return (backend, source). Single override: cookie. Fallback: env MAIL_BACKEND.
+    - backend: 'mailcatcher' or 'google'
+    - source: 'cookie' or 'config'
+    """
+    from flask import request
+    cookie_val = request.cookies.get('mail_backend', '').strip().lower() if request else ''
+    if cookie_val in ('mailcatcher', 'google'):
+        return cookie_val, 'cookie'
+    config_val = app.config.get('MAIL_BACKEND', 'mailcatcher')
+    return (config_val if config_val in ('mailcatcher', 'google') else 'mailcatcher', 'config')
+
+
+def send_mail_using_current_config(app, msg):
+    """
+    Single entry point: resolve effective backend, build SMTP params, send via smtplib.
+    Does not mutate app.config.
+    """
+    import smtplib
+    effective, _ = get_effective_mail_backend_with_source(app)
+    params = get_mail_connection_params(effective)
+    from_addr = msg.sender
+    to_addrs = list(msg.recipients) + list(getattr(msg, 'bcc', []) or []) + list(getattr(msg, 'cc', []) or [])
+    to_addrs = [a for a in to_addrs if a]
+    if not to_addrs:
+        return
+    try:
+        payload = msg.as_bytes()
+    except AttributeError:
+        payload = (msg.as_string() if hasattr(msg, 'as_string') else str(msg)).encode(
+            getattr(msg, 'charset', 'utf-8') or 'utf-8'
+        )
+    if params['use_ssl']:
+        smtp = smtplib.SMTP_SSL(params['server'], params['port'])
+    else:
+        smtp = smtplib.SMTP(params['server'], params['port'])
+    if params['use_tls'] and not params['use_ssl']:
+        smtp.starttls()
+    if params['username'] and params['password']:
+        smtp.login(params['username'], params['password'])
+    smtp.sendmail(from_addr, to_addrs, payload)
+    smtp.quit()
+
+
+def format_exception_location(exc):
+    """Return a string like 'andelsbiodling.py:274 in send_invoices' for the frame where the exception was raised."""
+    if getattr(exc, '__traceback__', None) is None:
+        return ''
+    tb = traceback.extract_tb(exc.__traceback__)
+    if not tb:
+        return ''
+    frame = tb[-1]
+    return f" ({os.path.basename(frame.filename)}:{frame.lineno} in {frame.name})"
+
 
 def generate_pdf_weasyprint(template_path, output_path, context, base_url=None):
     """
@@ -32,7 +120,6 @@ def generate_pdf_weasyprint(template_path, output_path, context, base_url=None):
         current_app.logger.info(f"Successfully generated PDF at {output_path} using WeasyPrint and Jinja2 Template")
         return True
     except Exception as e:
-        import traceback
         error_msg = f"Error generating PDF with WeasyPrint/Jinja2: {str(e)}\n{traceback.format_exc()}"
         current_app.logger.error(error_msg)
         return False

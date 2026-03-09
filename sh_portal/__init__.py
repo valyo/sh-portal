@@ -97,13 +97,19 @@ def create_app():
     app.register_blueprint(lammandel)
 
     @app.context_processor
-    def inject_version():
+    def inject_version_and_mail():
+        from .utils import get_effective_mail_backend_with_source
         version_path = os.path.join(os.path.dirname(__file__), '..', 'VERSION')
         try:
             with open(version_path) as f:
                 version = f.read().strip() or 'dev'
         except OSError:
             version = 'dev'
-        return {'app_version': version}
+        effective_mail, mail_backend_source = get_effective_mail_backend_with_source(app)
+        return {
+            'app_version': version,
+            'mail_backend': effective_mail,
+            'mail_backend_source': mail_backend_source,
+        }
 
     return app
