@@ -163,9 +163,23 @@
         .footer-col strong {
             color: #6d2e1c;
         }
+        .intro-message {
+            padding: 0 40px 24px 40px;
+            font-size: 1.05em;
+            line-height: 1.6;
+            color: #3d1f1c;
+        }
+        .intro-message p {
+            margin: 0 0 0.8em 0;
+        }
     </style>
 </head>
 <body>
+    <div class="intro-message">
+        <p>Hej {{ booking.name.split()[0] if booking.name else '' }}!</p>
+        <p>Stort tack för att du väljer att stödja biodlingen och den biologiska mångfalden.</p>
+        <p>Bifogat finner du fakturan för din beställning med all nödvändig betalningsinformation.</p>
+    </div>
     <div class="header">
         <div class="logo-block">
             <img src="cid:{{ logo_cid }}" alt="Solberg Honung logotyp">
