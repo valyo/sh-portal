@@ -3,11 +3,23 @@ from flask import current_app, flash
 import pandas as pd
 import os
 import re
+import traceback
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from weasyprint import HTML
 from jinja2 import Template
 from io import BytesIO
+
+def format_exception_location(exc):
+    """Return a string like 'andelsbiodling.py:274 in send_invoices' for the frame where the exception was raised."""
+    if getattr(exc, '__traceback__', None) is None:
+        return ''
+    tb = traceback.extract_tb(exc.__traceback__)
+    if not tb:
+        return ''
+    frame = tb[-1]
+    return f" ({os.path.basename(frame.filename)}:{frame.lineno} in {frame.name})"
+
 
 def generate_pdf_weasyprint(template_path, output_path, context, base_url=None):
     """
@@ -32,7 +44,6 @@ def generate_pdf_weasyprint(template_path, output_path, context, base_url=None):
         current_app.logger.info(f"Successfully generated PDF at {output_path} using WeasyPrint and Jinja2 Template")
         return True
     except Exception as e:
-        import traceback
         error_msg = f"Error generating PDF with WeasyPrint/Jinja2: {str(e)}\n{traceback.format_exc()}"
         current_app.logger.error(error_msg)
         return False

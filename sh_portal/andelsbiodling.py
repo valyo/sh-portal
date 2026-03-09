@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import re
 import os
-from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id, generate_pdf_weasyprint
+from .utils import import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id, generate_pdf_weasyprint, format_exception_location
 from flask_mail import Message
 
 andelsbiodling = Blueprint('andelsbiodling', __name__)
@@ -277,7 +277,7 @@ def send_invoices():
                 current_app.logger.info(f"Successfully sent invoice for booking {booking.id}")
 
             except Exception as e:
-                error_msg = f"Error processing booking {booking.id}: {str(e)}"
+                error_msg = f"Error processing booking {booking.id}: {str(e)}{format_exception_location(e)}"
                 current_app.logger.error(error_msg)
                 errors.append(error_msg)
                 continue
@@ -290,6 +290,8 @@ def send_invoices():
             message += f' {skipped_count} invoices already existed and were skipped.'
 
         flash(message, 'success')
+        for err in errors:
+            flash(err, 'error')
         return jsonify({
             'success': True,
             'message': message,
@@ -297,7 +299,7 @@ def send_invoices():
         })
     except Exception as e:
         db.session.rollback()
-        error_msg = f"Error sending invoices: {str(e)}"
+        error_msg = f"Error sending invoices: {str(e)}{format_exception_location(e)}"
         current_app.logger.error(error_msg)
         return jsonify({'error': error_msg}), 500
 
