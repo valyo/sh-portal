@@ -7,8 +7,8 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    generate_pdf_weasyprint, format_exception_location, get_effective_mail_backend,
-    get_effective_mail_backend_with_source, apply_mail_backend, send_mail_using_current_config,
+    generate_pdf_weasyprint, format_exception_location, get_effective_mail_backend_with_source,
+    get_mail_connection_params, send_mail_using_current_config,
 )
 from flask_mail import Message
 
@@ -273,18 +273,11 @@ def send_invoices():
                         msg.attach(pdf_filename, 'application/pdf', fp.read())
 
                 effective, source = get_effective_mail_backend_with_source(current_app)
-                old_cfg = {k: current_app.config.get(k) for k in ('MAIL_SERVER', 'MAIL_PORT', 'MAIL_USE_TLS', 'MAIL_USE_SSL', 'MAIL_USERNAME', 'MAIL_PASSWORD')}
-                apply_mail_backend(current_app, effective)
-                server = current_app.config['MAIL_SERVER']
-                port = current_app.config['MAIL_PORT']
+                params = get_mail_connection_params(effective)
                 current_app.logger.info(
-                    f"Mail backend: {effective!r} (source={source}), server={server}:{port}. Sending to {booking.email}"
+                    f"Mail backend: {effective!r} (source={source}), server={params['server']}:{params['port']}. Sending to {booking.email}"
                 )
-                try:
-                    send_mail_using_current_config(current_app, msg)
-                finally:
-                    for k, v in old_cfg.items():
-                        current_app.config[k] = v
+                send_mail_using_current_config(current_app, msg)
 
                 # Only mark as sent if email was successful
                 invoice.sent = True

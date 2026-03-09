@@ -73,7 +73,7 @@ def logout():
 
 @main.route('/api/mail-backend', methods=['GET', 'POST'])
 def mail_backend():
-    """GET: return current effective mail backend. POST: set cookie + session (body: {"backend": "mailcatcher"|"google"})."""
+    """GET: return current effective mail backend. POST: set cookie (body: {"backend": "mailcatcher"|"google"})."""
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
     if request.method == 'GET':
@@ -84,10 +84,8 @@ def mail_backend():
     backend = (data.get('backend') or '').strip().lower()
     if backend not in ALLOWED_MAIL_BACKENDS:
         return jsonify({'error': f'Invalid backend. Use one of: {", ".join(ALLOWED_MAIL_BACKENDS)}'}), 400
-    session['mail_backend'] = backend
-    current_app.logger.info(f"Setting mail backend to {backend!r} (session + cookie)")
+    current_app.logger.info(f"Setting mail backend to {backend!r} (cookie)")
     resp = jsonify({'success': True, 'mail_backend': backend})
-    # Cookie ensures the choice persists even if session doesn't (e.g. in some Docker/proxy setups)
     resp.set_cookie('mail_backend', backend, max_age=60 * 60 * 24 * 7, samesite='Lax', path='/')
     return resp
 
