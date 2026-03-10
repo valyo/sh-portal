@@ -12,12 +12,13 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
         <div class="container">
             <a class="navbar-brand" href="/">SH Portal</a>
+            <span class="text-muted small align-middle">v{{ app_version }}</span>
             {% if user %}
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav me-auto">
+                    <ul class="navbar-nav me-auto" style="margin-left: 3.5rem;">
                         <li class="nav-item">
                             <a class="nav-link" href="/">Home</a>
                         </li>
@@ -53,7 +54,6 @@
                                 <li><a class="dropdown-item" href="/logout">Logout</a></li>
                             </ul>
                         </div>
-                        <span class="nav-link text-muted small ms-3">v{{ app_version }}</span>
                     </div>
                 </div>
             {% else %}
@@ -61,7 +61,6 @@
                     <a class="nav-link" href="/login">
                         <i class="bi bi-github"></i> Login with GitHub
                     </a>
-                    <span class="nav-link text-muted small ms-3">v{{ app_version }}</span>
                 </div>
             {% endif %}
         </div>
