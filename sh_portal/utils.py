@@ -185,6 +185,33 @@ def generate_invoice_pdf(html_content, output_path):
         current_app.logger.error(f"Error generating invoice PDF with WeasyPrint: {str(e)}")
         return False
 
+
+def get_or_create_customer(db, email, name, telephone, address, postnummer, ort):
+    """
+    Return a Customer for the given contact data. If a customer with this email exists,
+    update their fields and return it; otherwise create and return a new one.
+    """
+    from .models import Customer
+    customer = db.session.query(Customer).filter_by(email=email).first()
+    if customer:
+        customer.name = name
+        customer.telephone = telephone
+        customer.address = address
+        customer.postnummer = postnummer
+        customer.ort = ort
+        return customer
+    customer = Customer(
+        email=email,
+        name=name,
+        telephone=telephone,
+        address=address,
+        postnummer=postnummer,
+        ort=ort,
+    )
+    db.session.add(customer)
+    return customer
+
+
 def import_bookings_from_sheet(
     db,
     BookingsModel,
@@ -227,22 +254,26 @@ def import_bookings_from_sheet(
             flash(f'Error parsing timestamp for booking: {row["email"]}', 'error')
             continue
 
-        existing_booking = BookingsModel.query.filter_by(
+        customer = get_or_create_customer(
+            db,
             email=row['email'],
+            name=row['name'],
+            telephone=row['telephone'],
+            address=row['address'],
+            postnummer=row['postnummer'],
+            ort=row['ort'],
+        )
+        existing_booking = BookingsModel.query.filter_by(
+            customer_id=customer.id,
             season_id=season_id
         ).first()
 
         if not existing_booking:
             booking = BookingsModel(
                 season_id=season_id,
+                customer_id=customer.id,
                 timestamp=timestamp_obj,
-                email=row['email'],
-                name=row['name'],
-                telephone=row['telephone'],
-                address=row['address'],
-                postnummer=row['postnummer'],
-                ort=row['ort'],
-                message=row['message'],
+                message=row.get('message', ''),
                 quantity=int(row['number'])
             )
             db.session.add(booking)

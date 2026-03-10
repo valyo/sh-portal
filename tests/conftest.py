@@ -59,19 +59,34 @@ def season(app):
 
 
 @pytest.fixture
-def booking(app, season):
-    """Create one booking (andelsbiodling) for endpoint tests."""
-    from sh_portal.models import Bookings
+def customer(app):
+    """Create one customer for booking tests."""
+    from sh_portal.models import Customer
     from sh_portal import db
     with app.app_context():
-        b = Bookings(
-            season_id=season.id,
+        c = Customer(
             email="test@example.com",
             name="Test User",
             telephone="0700000000",
             address="Street 1",
             postnummer="12345",
             ort="Stockholm",
+        )
+        db.session.add(c)
+        db.session.commit()
+        db.session.refresh(c)
+        yield c
+
+
+@pytest.fixture
+def booking(app, season, customer):
+    """Create one booking (andelsbiodling) for endpoint tests."""
+    from sh_portal.models import Bookings
+    from sh_portal import db
+    with app.app_context():
+        b = Bookings(
+            season_id=season.id,
+            customer_id=customer.id,
             quantity=2,
         )
         db.session.add(b)

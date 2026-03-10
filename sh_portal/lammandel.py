@@ -155,12 +155,12 @@ def update_booking(booking_id):
         abort(404)
 
     try:
-        booking.name = request.form.get('name')
-        booking.email = request.form.get('email')
-        booking.telephone = request.form.get('telephone')
-        booking.address = request.form.get('address')
-        booking.postnummer = request.form.get('postnummer')
-        booking.ort = request.form.get('ort')
+        booking.customer.name = request.form.get('name')
+        booking.customer.email = request.form.get('email')
+        booking.customer.telephone = request.form.get('telephone')
+        booking.customer.address = request.form.get('address')
+        booking.customer.postnummer = request.form.get('postnummer')
+        booking.customer.ort = request.form.get('ort')
         booking.message = request.form.get('message')
         booking.quantity = int(request.form.get('quantity'))
         booking.certificate_name = request.form.get('certificate_name')
