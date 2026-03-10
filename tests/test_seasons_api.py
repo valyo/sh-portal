@@ -61,7 +61,8 @@ class TestUpdateSeason:
         assert rv.get_json() == {"success": True}
         with app.app_context():
             from sh_portal.models import Season
-            s = Season.query.get(season.id)
+            from sh_portal import db
+            s = db.session.get(Season, season.id)
             assert s.price == 150.0
             assert s.price_lamm == 250.0
 
@@ -84,7 +85,8 @@ class TestDeleteSeason:
         assert rv.get_json() == {"success": True}
         with app.app_context():
             from sh_portal.models import Season
-            assert Season.query.get(sid) is None
+            from sh_portal import db
+            assert db.session.get(Season, sid) is None
 
 
 class TestListSeasons:

@@ -65,7 +65,8 @@ class TestUpdateBooking:
         assert rv.get_json() == {"success": True}
         with app.app_context():
             from sh_portal.models import Bookings
-            b = Bookings.query.get(booking.id)
+            from sh_portal import db
+            b = db.session.get(Bookings, booking.id)
             assert b.name == "Updated Name"
             assert b.quantity == 5
 
