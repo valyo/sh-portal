@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Customers - SH Portal{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Customers</h1>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Address</th>
+                                    <th>Postnummer</th>
+                                    <th>Ort</th>
+                                    <th>Bookings</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for customer in customers %}
+                                <tr>
+                                    <td>{{ customer.id }}</td>
+                                    <td>{{ customer.name }}</td>
+                                    <td><a href="mailto:{{ customer.email }}">{{ customer.email }}</a></td>
+                                    <td>{{ customer.address }}</td>
+                                    <td>{{ customer.postnummer }}</td>
+                                    <td>{{ customer.ort }}</td>
+                                    <td>
+                                        {% set honey_count = customer.bookings|length %}
+                                        {% set lamb_count = customer.bookings_lamm|length %}
+                                        {% if honey_count or lamb_count %}
+                                            {% if honey_count %}<span class="badge bg-warning text-dark">Andelsbiodling: {{ honey_count }}</span>{% endif %}
+                                            {% if lamb_count %}<span class="badge bg-secondary ms-1">Lammandel: {{ lamb_count }}</span>{% endif %}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary manage-customer"
+                                                data-customer-id="{{ customer.id }}">
+                                            <i class="bi bi-gear"></i> Manage
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-muted text-center py-4">No customers yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Customer Modal -->
+    <div class="modal fade" id="manageCustomerModal" tabindex="-1" aria-labelledby="manageCustomerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="manageCustomerModalLabel">Manage Customer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="manageCustomerForm" method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" id="customerId" name="customer_id">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="customerName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="customerName" name="name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customerEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="customerEmail" name="email" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="customerTelephone" class="form-label">Telephone</label>
+                                <input type="text" class="form-control" id="customerTelephone" name="telephone">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customerAddress" class="form-label">Address</label>
+                                <input type="text" class="form-control" id="customerAddress" name="address">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="customerPostnummer" class="form-label">Postnummer</label>
+                                <input type="text" class="form-control" id="customerPostnummer" name="postnummer">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customerOrt" class="form-label">Ort</label>
+                                <input type="text" class="form-control" id="customerOrt" name="ort">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Bookings by season</label>
+                            <div id="customerBookingsList" class="border rounded p-2 bg-light small">
+                                <span class="text-muted">Loading…</span>
+                            </div>
+                            <div class="form-text">Seasons this customer has bookings in (Andelsbiodling and/or Lammandel).</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const manageCustomerModalEl = document.getElementById('manageCustomerModal');
+    const manageCustomerModal = manageCustomerModalEl ? new bootstrap.Modal(manageCustomerModalEl) : null;
+    const manageCustomerForm = document.getElementById('manageCustomerForm');
+    const bookingsListEl = document.getElementById('customerBookingsList');
+
+    function renderBookings(bookings) {
+        if (!bookings || bookings.length === 0) {
+            bookingsListEl.innerHTML = '<span class="text-muted">No bookings.</span>';
+            return;
+        }
+        const byYear = {};
+        bookings.forEach(function(b) {
+            const year = b.year;
+            if (!byYear[year]) byYear[year] = [];
+            byYear[year].push(b.type === 'lammandel' ? 'Lammandel' : 'Andelsbiodling');
+        });
+        const lines = Object.keys(byYear).sort(function(a, b) { return parseInt(b, 10) - parseInt(a, 10); }).map(function(year) {
+            return year + ': ' + byYear[year].join(', ');
+        });
+        bookingsListEl.innerHTML = lines.join('<br>');
+    }
+
+    document.querySelectorAll('.manage-customer').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const customerId = this.dataset.customerId;
+            document.getElementById('customerId').value = customerId;
+            bookingsListEl.innerHTML = '<span class="text-muted">Loading…</span>';
+
+            fetch('/api/customer/' + customerId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    document.getElementById('customerName').value = data.name || '';
+                    document.getElementById('customerEmail').value = data.email || '';
+                    document.getElementById('customerTelephone').value = data.telephone || '';
+                    document.getElementById('customerAddress').value = data.address || '';
+                    document.getElementById('customerPostnummer').value = data.postnummer || '';
+                    document.getElementById('customerOrt').value = data.ort || '';
+                    renderBookings(data.bookings);
+                    if (manageCustomerModal) manageCustomerModal.show();
+                })
+                .catch(function(err) {
+                    console.error('Error fetching customer:', err);
+                    bookingsListEl.innerHTML = '<span class="text-danger">Error loading customer.</span>';
+                });
+        });
+    });
+
+    if (manageCustomerForm) {
+        manageCustomerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const customerId = document.getElementById('customerId').value;
+            const formData = new FormData(this);
+            formData.set('name', document.getElementById('customerName').value);
+            formData.set('email', document.getElementById('customerEmail').value);
+            formData.set('telephone', document.getElementById('customerTelephone').value);
+            formData.set('address', document.getElementById('customerAddress').value);
+            formData.set('postnummer', document.getElementById('customerPostnummer').value);
+            formData.set('ort', document.getElementById('customerOrt').value);
+
+            fetch('/api/customer/' + customerId, {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (manageCustomerModal) manageCustomerModal.hide();
+                    window.location.reload();
+                } else {
+                    alert('Error updating customer: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(function(err) {
+                console.error('Error updating customer:', err);
+                alert('Error updating customer.');
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
