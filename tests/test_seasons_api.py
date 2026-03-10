@@ -135,3 +135,33 @@ class TestCreateSeason:
             s = Season.query.filter_by(year="2030").first()
             assert s is not None
             assert s.price == 100.0
+
+    def test_duplicate_year_redirects_with_flash(self, logged_in_client, app):
+        """Creating a season for a year that already exists must not create a second one and must flash error."""
+        with app.app_context():
+            from sh_portal.models import Season
+            from sh_portal import db
+            existing = Season(year="2029", price=50.0, price_lamm=100.0)
+            db.session.add(existing)
+            db.session.commit()
+        # First create 2029 would work; we already have 2029 in DB, so try to create again
+        rv = logged_in_client.post(
+            "/seasons/create",
+            data={
+                "year": "2029",
+                "price": "99",
+                "price_lamm": "199",
+                "google_sheets_link_honey": "",
+                "sheet_range_honey": "",
+                "google_sheets_link_lamm": "",
+                "sheet_range_lamm": "",
+            },
+            follow_redirects=True,
+        )
+        assert rv.status_code == 200
+        # Flash "A season for this year already exists." should appear on the page
+        assert b"A season for this year already exists" in rv.data or b"already exists" in rv.data
+        with app.app_context():
+            from sh_portal.models import Season
+            seasons_2029 = Season.query.filter_by(year="2029").all()
+            assert len(seasons_2029) == 1  # still only one, no duplicate

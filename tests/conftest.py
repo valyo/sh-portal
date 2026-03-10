@@ -5,14 +5,21 @@ import pytest
 
 @pytest.fixture
 def app():
-    """Create application for testing."""
-    from sh_portal import create_app
-    app = create_app()
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///:memory:')
-    app.config['MAIL_BACKEND'] = os.getenv('MAIL_BACKEND', 'mailcatcher')
-    return app
+    """Create application for testing. Uses in-memory SQLite so the real DB is never touched."""
+    # Force in-memory DB before create_app() so db.create_all() runs on :memory:, not .env DATABASE_URL
+    prev_db = os.environ.pop('DATABASE_URL', None)
+    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+    try:
+        from sh_portal import create_app
+        app = create_app()
+        app.config['TESTING'] = True
+        app.config['WTF_CSRF_ENABLED'] = False
+        app.config['MAIL_BACKEND'] = os.getenv('MAIL_BACKEND', 'mailcatcher')
+        return app
+    finally:
+        os.environ.pop('DATABASE_URL', None)
+        if prev_db is not None:
+            os.environ['DATABASE_URL'] = prev_db
 
 
 @pytest.fixture
