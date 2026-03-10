@@ -26,25 +26,60 @@ class Admin(db.Model, UserMixin):
     # password = db.Column(db.String(150))
 
 
-class Bookings(db.Model):
-    __tablename__ = 'bookings'
+class Customer(db.Model):
+    """Shared customer/contact data for bookings (andelsbiodling and lammandel)."""
+    __tablename__ = 'customers'
 
     id = db.Column(db.Integer, primary_key=True)
-    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
-    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
     email = db.Column(db.String(150), nullable=False)
     name = db.Column(db.String(150), nullable=False)
     telephone = db.Column(db.String(50), nullable=False)
     address = db.Column(db.String(200), nullable=False)
     postnummer = db.Column(db.String(10), nullable=False)
     ort = db.Column(db.String(100), nullable=False)
+
+    def __repr__(self):
+        return f'<Customer {self.name} ({self.email})>'
+
+
+class Bookings(db.Model):
+    __tablename__ = 'bookings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
     message = db.Column(db.Text)
     quantity = db.Column(db.Integer, nullable=False)
     certificate_name = db.Column(db.String(150), nullable=True)
     certificate_quantity = db.Column(db.Integer, nullable=True)
 
-    # Relationship with Season
     season = db.relationship('Season', backref=db.backref('bookings', lazy=True))
+    customer = db.relationship('Customer', backref=db.backref('bookings', lazy=True))
+
+    @property
+    def email(self):
+        return self.customer.email if self.customer else None
+
+    @property
+    def name(self):
+        return self.customer.name if self.customer else None
+
+    @property
+    def telephone(self):
+        return self.customer.telephone if self.customer else None
+
+    @property
+    def address(self):
+        return self.customer.address if self.customer else None
+
+    @property
+    def postnummer(self):
+        return self.customer.postnummer if self.customer else None
+
+    @property
+    def ort(self):
+        return self.customer.ort if self.customer else None
 
     def __repr__(self):
         return f'<Bookings {self.name} - {self.season.year}>'
@@ -55,20 +90,39 @@ class BookingsLamm(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
-    email = db.Column(db.String(150), nullable=False)
-    name = db.Column(db.String(150), nullable=False)
-    telephone = db.Column(db.String(50), nullable=False)
-    address = db.Column(db.String(200), nullable=False)
-    postnummer = db.Column(db.String(10), nullable=False)
-    ort = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text)
     quantity = db.Column(db.Integer, nullable=False)
     certificate_name = db.Column(db.String(150), nullable=True)
     certificate_quantity = db.Column(db.Integer, nullable=True)
 
-    # Relationship with Season
     season = db.relationship('Season', backref=db.backref('bookings_lamm', lazy=True))
+    customer = db.relationship('Customer', backref=db.backref('bookings_lamm', lazy=True))
+
+    @property
+    def email(self):
+        return self.customer.email if self.customer else None
+
+    @property
+    def name(self):
+        return self.customer.name if self.customer else None
+
+    @property
+    def telephone(self):
+        return self.customer.telephone if self.customer else None
+
+    @property
+    def address(self):
+        return self.customer.address if self.customer else None
+
+    @property
+    def postnummer(self):
+        return self.customer.postnummer if self.customer else None
+
+    @property
+    def ort(self):
+        return self.customer.ort if self.customer else None
 
     def __repr__(self):
         return f'<BookingsLamm {self.name} - {self.season.year}>'
