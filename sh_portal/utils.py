@@ -212,6 +212,73 @@ def get_or_create_customer(db, email, name, telephone, address, postnummer, ort)
     return customer
 
 
+def _parse_booking_timestamp(s):
+    """
+    Parse a timestamp string from Google Sheets (or similar) into a datetime.
+    Tries several common formats, then normalizes M/D/YY H:M:S (single digits ok).
+    Returns datetime or None if unparseable.
+    """
+    if not s or not isinstance(s, str):
+        return None
+    s = s.strip()
+    if not s:
+        return None
+
+    # Try strict formats first
+    formats = [
+        '%m/%d/%Y %H:%M:%S',   # 09/29/2024 19:12:04
+        '%m/%d/%y %H:%M:%S',   # 09/29/24 19:12:04
+        '%Y-%m-%d %H:%M:%S',   # 2024-09-29 19:12:04
+        '%Y-%m-%d %H:%M:%S.%f',  # with microseconds
+        '%Y-%m-%dT%H:%M:%S',   # ISO-like
+        '%d/%m/%Y %H:%M:%S',
+        '%d/%m/%y %H:%M:%S',
+        '%d.%m.%Y %H:%M:%S',
+        '%d.%m.%y %H:%M:%S',
+    ]
+    for fmt in formats:
+        try:
+            return datetime.strptime(s[:26], fmt)  # cap length for %f
+        except ValueError:
+            continue
+
+    # Normalize M/D/YY H:M:S (single-digit month, day, second; 2-digit year)
+    try:
+        parts = s.split(None, 1)
+        if len(parts) != 2:
+            return None
+        date_part, time_part = parts
+    except (ValueError, AttributeError):
+        return None
+
+    try:
+        date_segments = date_part.replace('.', '/').split('/')
+        if len(date_segments) != 3:
+            return None
+        m, d, y = [x.zfill(2) for x in date_segments]
+        if len(y) == 2:
+            y = '20' + y
+        date_normalized = f'{m}/{d}/{y}'
+    except (ValueError, AttributeError):
+        return None
+
+    try:
+        time_segments = time_part.split(':')
+        if len(time_segments) < 3:
+            return None
+        # Drop fractional seconds if present (e.g. 04.123 -> 04)
+        time_segments = [x.split('.')[0].zfill(2) for x in time_segments[:3]]
+        time_normalized = ':'.join(time_segments)
+    except (ValueError, AttributeError):
+        return None
+
+    normalized = f'{date_normalized} {time_normalized}'
+    try:
+        return datetime.strptime(normalized, '%m/%d/%Y %H:%M:%S')
+    except ValueError:
+        return None
+
+
 def import_bookings_from_sheet(
     db,
     BookingsModel,
@@ -231,9 +298,11 @@ def import_bookings_from_sheet(
         flash('No data to import.', 'error')
         return False
 
-    # Check if the first row is a header (contains 'timestamp' or 'Timestamp')
-    if sheet_data and sheet_data[0][0].lower() in ('timestamp', 'tid', 'date'):
-        sheet_data = sheet_data[1:]  # Skip header row
+    # Check if the first row is a header (timestamp column header in various languages)
+    if sheet_data:
+        first_cell = (sheet_data[0][0] or '').strip().lower()
+        if first_cell in ('timestamp', 'tid', 'date', 'tidstämpel'):
+            sheet_data = sheet_data[1:]  # Skip header row
 
     columns = [
         'timestamp', 'email', 'name', 'telephone',
@@ -246,13 +315,25 @@ def import_bookings_from_sheet(
 
     imported_count = 0
     for _, row in df.iterrows():
-        try:
-            timestamp_obj = datetime.strptime(row['timestamp'], '%m/%d/%Y %H:%M:%S')
-            current_app.logger.info(f"Timestamp: {timestamp_obj}")
-        except Exception as e:
-            current_app.logger.error(f"Error parsing timestamp: {str(e)}")
+        timestamp_obj = _parse_booking_timestamp(row['timestamp'])
+        if timestamp_obj is None:
+            current_app.logger.error(f"Error parsing timestamp: {row['timestamp']!r}")
             flash(f'Error parsing timestamp for booking: {row["email"]}', 'error')
             continue
+
+        # Quantity: allow missing or empty (default 1)
+        try:
+            raw_num = row.get('number')
+            if raw_num is None or (isinstance(raw_num, float) and pd.isna(raw_num)) or str(raw_num).strip() == '':
+                quantity = 1
+            else:
+                quantity = int(float(raw_num))
+        except (ValueError, TypeError):
+            quantity = 1
+        if quantity < 1:
+            quantity = 1
+
+        current_app.logger.info(f"Timestamp: {timestamp_obj}")
 
         customer = get_or_create_customer(
             db,
@@ -274,7 +355,7 @@ def import_bookings_from_sheet(
                 customer_id=customer.id,
                 timestamp=timestamp_obj,
                 message=row.get('message', ''),
-                quantity=int(row['number'])
+                quantity=quantity
             )
             db.session.add(booking)
             imported_count += 1
