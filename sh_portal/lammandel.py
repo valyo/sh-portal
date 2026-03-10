@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file
+from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
 from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
@@ -18,7 +18,9 @@ def generate_certificate(booking_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    booking = BookingsLamm.query.get_or_404(booking_id)
+    booking = db.session.get(BookingsLamm, booking_id)
+    if booking is None:
+        abort(404)
     season = booking.season
 
     # Prepare context for template
@@ -51,7 +53,9 @@ def import_bookings():
         flash('Season ID is required.', 'error')
         return redirect(url_for('lammandel.index'))
 
-    season = Season.query.get_or_404(season_id)
+    season = db.session.get(Season, int(season_id))
+    if season is None:
+        abort(404)
     sheet_link = season.google_sheets_link_lamm
     range_name = season.sheet_range_lamm
 
@@ -91,7 +95,7 @@ def index():
     selected_season = None
 
     if selected_season_id:
-        selected_season = Season.query.get(selected_season_id)
+        selected_season = db.session.get(Season, int(selected_season_id))
     elif seasons:
         selected_season = seasons[0]
 
@@ -119,7 +123,9 @@ def get_booking(booking_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    booking = BookingsLamm.query.get_or_404(booking_id)
+    booking = db.session.get(BookingsLamm, booking_id)
+    if booking is None:
+        abort(404)
     # Check if there is a paid invoice for this booking
     invoice = InvoiceLamm.query.filter_by(booking_id=booking.id).first()
     is_paid = invoice.date_payed is not None if invoice else False
@@ -144,7 +150,9 @@ def update_booking(booking_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    booking = BookingsLamm.query.get_or_404(booking_id)
+    booking = db.session.get(BookingsLamm, booking_id)
+    if booking is None:
+        abort(404)
 
     try:
         booking.name = request.form.get('name')
@@ -184,7 +192,7 @@ def send_invoices():
         current_app.logger.error("No season ID provided")
         return jsonify({'error': 'No season selected'}), 400
 
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     if not season:
         current_app.logger.error(f"Season {season_id} not found")
         return jsonify({'error': 'Season not found'}), 400
@@ -315,7 +323,9 @@ def update_invoice_payment(invoice_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    invoice = InvoiceLamm.query.get_or_404(invoice_id)
+    invoice = db.session.get(InvoiceLamm, invoice_id)
+    if invoice is None:
+        abort(404)
     date_paid = request.json.get('date_paid')
 
     try:

@@ -99,6 +99,23 @@ A helper script `develop_pdf.py` is available to preview certificate templates l
    ```
    This will generate `certificate_preview.pdf` in the root directory and update it whenever you change the HTML template sh_portal/templates/certificate_pdf_template.html
 
+## Testing
+
+Tests use pytest and cover the mail backend selection (cookie vs config, connection params, API).
+
+1. **Install test dependencies** (in the same environment as the app):
+   ```bash
+   pip install -r requirements.txt -r requirements-dev.txt
+   ```
+
+2. **Run tests** (use `python -m pytest` so the venv’s Python is used, not a global/pyenv pytest):
+   ```bash
+   python -m pytest
+   ```
+   Or with coverage: `python -m pytest --cov=sh_portal --cov-report=term-missing`
+
+   To run only mail-related tests: `python -m pytest tests/test_mail_utils.py tests/test_mail_backend_api.py -v`
+
 ## Administration
 
 To create an initial admin user for GitHub OAuth login, you can use the custom Flask command:

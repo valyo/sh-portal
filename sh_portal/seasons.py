@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, request, current_app, flash, jsonify
+from flask import Blueprint, render_template, redirect, url_for, session, request, current_app, flash, jsonify, abort
 from .models import Season
 from . import db
 
@@ -17,7 +17,9 @@ def get_season(season_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    season = Season.query.get_or_404(season_id)
+    season = db.session.get(Season, season_id)
+    if season is None:
+        abort(404)
     return jsonify({
         'id': season.id,
         'year': season.year,
@@ -34,7 +36,9 @@ def update_season(season_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    season = Season.query.get_or_404(season_id)
+    season = db.session.get(Season, season_id)
+    if season is None:
+        abort(404)
 
     try:
         season.year = request.form.get('year')
@@ -57,7 +61,9 @@ def delete_season(season_id):
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
-    season = Season.query.get_or_404(season_id)
+    season = db.session.get(Season, season_id)
+    if season is None:
+        abort(404)
 
     # Check if there are any bookings or invoices associated with this season
     if season.bookings or season.bookings_lamm or season.invoices or season.invoices_lamm:
