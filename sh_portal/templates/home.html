@@ -20,7 +20,31 @@
                     <div class="card-body">
                         <h2 class="card-title">Current Season</h2>
                         {% if latest_season %}
-                            <p class="card-text">Current season: {{ latest_season.year }}</p>
+                            <p class="card-text mb-3">Current season: <strong>{{ latest_season.year }}</strong></p>
+                            {% if season_stats %}
+                            <div class="row g-2 small">
+                                <div class="col-md-6">
+                                    <div class="border rounded p-2 bg-light">
+                                        <strong>Bookings</strong><br>
+                                        {{ season_stats.num_bookings }} total
+                                        ({{ season_stats.num_bookings_honey }} Andelsbiodling, {{ season_stats.num_bookings_lamm }} Lammandel)
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded p-2 bg-light">
+                                        <strong>Andelar</strong><br>
+                                        {{ season_stats.total_andelar }} total
+                                        ({{ season_stats.total_andelar_honey }} honey, {{ season_stats.total_andelar_lamm }} lamb)
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="border rounded p-2 bg-light">
+                                        <strong>Customers</strong><br>
+                                        {{ season_stats.new_customers }} new · {{ season_stats.returning_customers }} returning
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                         {% else %}
                             <p class="card-text">No seasons have been created yet.</p>
                         {% endif %}

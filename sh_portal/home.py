@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, current_app, jsonify
 from requests_oauthlib import OAuth2Session
 import os
-from .models import Admin, Season
+from .models import Admin, Season, Bookings, BookingsLamm
 from . import db
 main = Blueprint('main', __name__)
 
@@ -14,6 +14,64 @@ def get_oauth():
         scope=['user:email']
     )
 
+def _season_stats(latest_season):
+    """Return dict with booking counts, total andelar, and new vs returning customers for a season."""
+    if not latest_season:
+        return None
+    # Bookings count (andelsbiodling + lammandel)
+    num_bookings_honey = len(latest_season.bookings)
+    num_bookings_lamm = len(latest_season.bookings_lamm)
+    num_bookings = num_bookings_honey + num_bookings_lamm
+    # Total andelar (quantity) per product
+    total_andelar_honey = sum(b.quantity for b in latest_season.bookings)
+    total_andelar_lamm = sum(b.quantity for b in latest_season.bookings_lamm)
+    total_andelar = total_andelar_honey + total_andelar_lamm
+    # Unique customers in this season
+    customer_ids_this_season = set()
+    for b in latest_season.bookings:
+        customer_ids_this_season.add(b.customer_id)
+    for b in latest_season.bookings_lamm:
+        customer_ids_this_season.add(b.customer_id)
+    # New = first booking ever is in this season; returning = had a booking in an earlier season
+    try:
+        current_year_int = int(latest_season.year)
+    except (TypeError, ValueError):
+        current_year_int = 0
+    new_count = 0
+    returning_count = 0
+    for cid in customer_ids_this_season:
+        # Earliest season year this customer has a booking in (any product)
+        min_year = current_year_int
+        for b in Bookings.query.filter_by(customer_id=cid).all():
+            try:
+                y = int(b.season.year)
+                if y < min_year:
+                    min_year = y
+            except (TypeError, ValueError):
+                pass
+        for b in BookingsLamm.query.filter_by(customer_id=cid).all():
+            try:
+                y = int(b.season.year)
+                if y < min_year:
+                    min_year = y
+            except (TypeError, ValueError):
+                pass
+        if min_year >= current_year_int:
+            new_count += 1
+        else:
+            returning_count += 1
+    return {
+        'num_bookings': num_bookings,
+        'num_bookings_honey': num_bookings_honey,
+        'num_bookings_lamm': num_bookings_lamm,
+        'total_andelar': total_andelar,
+        'total_andelar_honey': total_andelar_honey,
+        'total_andelar_lamm': total_andelar_lamm,
+        'new_customers': new_count,
+        'returning_customers': returning_count,
+    }
+
+
 @main.route('/')
 def home():
     current_app.logger.info(f"Session: {session.get('user')}")
@@ -21,11 +79,13 @@ def home():
 
     # Get the latest season
     latest_season = Season.query.order_by(Season.year.desc()).first()
+    season_stats = _season_stats(latest_season) if latest_season else None
 
     return render_template('home.html',
                          user=session.get('user'),
                          just_logged_in=just_logged_in,
-                         latest_season=latest_season)
+                         latest_season=latest_season,
+                         season_stats=season_stats)
 
 @main.route('/login')
 def login():
