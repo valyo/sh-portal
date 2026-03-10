@@ -27,3 +27,47 @@ def logged_in_client(client):
     with client.session_transaction() as sess:
         sess['user'] = {'username': 'testuser', 'id': 1}
     return client
+
+
+@pytest.fixture
+def season(app):
+    """Create one season in the DB for endpoint tests."""
+    from sh_portal.models import Season
+    from sh_portal import db
+    with app.app_context():
+        s = Season(
+            year='2025',
+            price=100.0,
+            price_lamm=200.0,
+            google_sheets_link_honey='',
+            sheet_range_honey='',
+            google_sheets_link_lamm='',
+            sheet_range_lamm='',
+        )
+        db.session.add(s)
+        db.session.commit()
+        db.session.refresh(s)
+        yield s
+        # In-memory DB is discarded after test; no teardown needed
+
+
+@pytest.fixture
+def booking(app, season):
+    """Create one booking (andelsbiodling) for endpoint tests."""
+    from sh_portal.models import Bookings
+    from sh_portal import db
+    with app.app_context():
+        b = Bookings(
+            season_id=season.id,
+            email="test@example.com",
+            name="Test User",
+            telephone="0700000000",
+            address="Street 1",
+            postnummer="12345",
+            ort="Stockholm",
+            quantity=2,
+        )
+        db.session.add(b)
+        db.session.commit()
+        db.session.refresh(b)
+        yield b
