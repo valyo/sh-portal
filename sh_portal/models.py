@@ -144,9 +144,69 @@ class Invoice(db.Model):
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices', lazy=True))
     booking = db.relationship('Bookings', backref=db.backref('invoices', lazy=True))
+    sale = db.relationship('Sale', backref=db.backref('invoice'), uselist=False)
 
     def __repr__(self):
         return f'<Invoice {self.invoice_id} for booking {self.booking_id}>'
+
+
+class Product(db.Model):
+    """Honey product type (sort)."""
+    __tablename__ = 'products'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<Product {self.name}>'
+
+
+class SaleCategory(db.Model):
+    """Sales channel / customer category (andel, kollega, granne, etc.)."""
+    __tablename__ = 'sale_categories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<SaleCategory {self.name}>'
+
+
+class Sale(db.Model):
+    """A single honey sale. Can be from CSV/manual or created when an andel invoice is marked paid."""
+    __tablename__ = 'sales'
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    skord = db.Column(db.String(20), nullable=False)  # harvest year or "okänd"
+    burk = db.Column(db.String(30), nullable=True)  # e.g. "2.55 kg"
+    unit_price = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    consistency = db.Column(db.String(20), nullable=False, default='fast')  # fast, flytande, fryst
+    apiary = db.Column(db.String(50), nullable=False, default='Solberg')
+    category_id = db.Column(db.Integer, db.ForeignKey('sale_categories.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)  # portal customer (andel)
+    customer_name = db.Column(db.String(200), nullable=True)  # free-text when no customer_id
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True)  # set when created from paid andel invoice
+
+    product = db.relationship('Product', backref=db.backref('sales', lazy=True))
+    category = db.relationship('SaleCategory', backref=db.backref('sales', lazy=True))
+    customer = db.relationship('Customer', backref=db.backref('sales', lazy=True))
+
+    @property
+    def total_price(self):
+        return round(self.unit_price * self.quantity, 2)
+
+    @property
+    def display_customer(self):
+        """Customer for display: linked Customer name or free-text customer_name."""
+        if self.customer_id and self.customer:
+            return self.customer.name
+        return self.customer_name or '—'
+
+    def __repr__(self):
+        return f'<Sale {self.id} {self.timestamp.date()} {self.display_customer}>'
 
 
 class InvoiceLamm(db.Model):

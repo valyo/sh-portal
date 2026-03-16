@@ -78,10 +78,12 @@ def create_app():
 
     # Import flask commands - all
     from sh_portal.commands import (
-        create_new_admin
+        create_new_admin,
+        import_sales,
     )
     # Add flask commands - general
     app.cli.add_command(create_new_admin)
+    app.cli.add_command(import_sales)
 
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -91,12 +93,14 @@ def create_app():
     from sh_portal.customers import customers_bp
     from sh_portal.andelsbiodling import andelsbiodling
     from sh_portal.lammandel import lammandel
+    from sh_portal.sales import sales_bp
 
     app.register_blueprint(main)
     app.register_blueprint(seasons)
     app.register_blueprint(customers_bp)
     app.register_blueprint(andelsbiodling)
     app.register_blueprint(lammandel)
+    app.register_blueprint(sales_bp)
 
     @app.context_processor
     def inject_version_and_mail():

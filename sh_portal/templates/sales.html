@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Sales - SH Portal{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Sales</h1>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="get" action="{{ url_for('sales.list_sales') }}" class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label for="year" class="form-label">Year</label>
+                            <select name="year" id="year" class="form-select form-select-sm">
+                                <option value="">All</option>
+                                {% for y in years %}
+                                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label for="category_id" class="form-label">Category</label>
+                            <select name="category_id" id="category_id" class="form-select form-select-sm">
+                                <option value="">All</option>
+                                {% for c in categories %}
+                                <option value="{{ c.id }}" {% if selected_category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label for="product_id" class="form-label">Product</label>
+                            <select name="product_id" id="product_id" class="form-select form-select-sm">
+                                <option value="">All</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}" {% if selected_product_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="andel_only" id="andel_only" value="1" {% if andel_only %}checked{% endif %}>
+                                <label class="form-check-label" for="andel_only">Andel only</label>
+                            </div>
+                            <small class="text-muted d-block">Sales from paid invoices</small>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+                            <a href="{{ url_for('sales.list_sales') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <strong>Sales stats</strong>
+                    {% if andel_only %}<span class="badge bg-success ms-2">Andel only</span>{% endif %}
+                    {% if selected_year or selected_category_id or selected_product_id %}
+                    <span class="text-muted small ms-2">(filtered)</span>
+                    {% endif %}
+                </div>
+                <div class="card-body py-2">
+                    <div class="row">
+                        <div class="col-auto">
+                            <strong>Total revenue</strong> {{ "%.2f"|format(total_revenue) }} kr
+                        </div>
+                        <div class="col-auto">
+                            <strong>Sales</strong> {{ total_count }}
+                        </div>
+                    </div>
+                    {% if stats_by_year or stats_by_category %}
+                    <div class="row mt-2 g-3">
+                        {% if stats_by_year %}
+                        <div class="col-12 col-md-6">
+                            <strong class="small text-muted">By year</strong>
+                            <ul class="list-unstyled mb-0 small">
+                                {% for r in stats_by_year %}
+                                <li>{{ r.year }}: {{ "%.2f"|format(r.revenue) }} kr ({{ r.count }} sales)</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        {% if stats_by_category %}
+                        <div class="col-12 col-md-6">
+                            <strong class="small text-muted">By category</strong>
+                            <ul class="list-unstyled mb-0 small">
+                                {% for r in stats_by_category %}
+                                <li>{{ r.name }}: {{ "%.2f"|format(r.revenue) }} kr ({{ r.count }} sales)</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Product</th>
+                                    <th>Skörd</th>
+                                    <th>Burk</th>
+                                    <th>Qty</th>
+                                    <th>Unit price</th>
+                                    <th>Total</th>
+                                    <th>Category</th>
+                                    <th>Customer</th>
+                                    <th>From invoice</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in sales %}
+                                <tr>
+                                    <td>{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '—' }}</td>
+                                    <td>{{ s.product.name if s.product else '—' }}</td>
+                                    <td>{{ s.skord }}</td>
+                                    <td>{{ s.burk or '—' }}</td>
+                                    <td>{{ s.quantity }}</td>
+                                    <td>{{ "%.2f"|format(s.unit_price) }} kr</td>
+                                    <td>{{ "%.2f"|format(s.total_price) }} kr</td>
+                                    <td><span class="badge bg-secondary">{{ s.category.name if s.category else '—' }}</span></td>
+                                    <td>{{ s.display_customer }}</td>
+                                    <td>{% if s.invoice_id %}<i class="bi bi-check-circle text-success" title="Andel invoice"></i>{% else %}—{% endif %}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="10" class="text-muted">No sales found. Import from CSV or mark andel invoices as paid.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
