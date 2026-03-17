@@ -10,6 +10,21 @@ from weasyprint import HTML
 from jinja2 import Template
 from io import BytesIO
 
+
+def normalize_customer_name(s):
+    """
+    Normalize a free-text customer name for consistent storage and statistics.
+    Trims and collapses whitespace, then title-cases each word.
+    Returns None for empty/whitespace-only input.
+    """
+    if not s or not isinstance(s, str):
+        return None
+    s = " ".join(s.split()).strip()
+    if not s:
+        return None
+    return s.title()
+
+
 def get_mail_connection_params(backend):
     """
     Return SMTP connection params for the given backend. Does not touch app.config.

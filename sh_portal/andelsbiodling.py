@@ -336,7 +336,7 @@ def create_sale_from_invoice(invoice):
         timestamp=sale_date,
         product_id=product.id,
         skord=str(season.year) if season else 'okänd',
-        burk='2.5 kg',
+        burk_kg=2.5,
         unit_price=unit_price,
         quantity=invoice.quantity,
         consistency='fast',
@@ -364,7 +364,13 @@ def update_invoice_payment(invoice_id):
     try:
         if date_paid:
             invoice.date_payed = datetime.strptime(date_paid, '%Y-%m-%d')
-            create_sale_from_invoice(invoice)
+            # Only create a sale when first marking as paid; do not recreate if the user
+            # had deleted the sale and then changes the payment date again.
+            if not was_already_paid:
+                create_sale_from_invoice(invoice)
+            elif hasattr(invoice, 'sale') and invoice.sale is not None:
+                # Update existing sale timestamp when payment date is changed
+                invoice.sale.timestamp = invoice.date_payed
         else:
             invoice.date_payed = None
             if hasattr(invoice, 'sale') and invoice.sale is not None:

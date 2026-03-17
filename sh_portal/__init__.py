@@ -34,7 +34,9 @@ def create_app():
 
     # Configure the Flask application using environment variables
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-secret-key')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///app.db')
+    # Default DB: instance/sh.db so app and manual edits use the same file (set DATABASE_URL in .env to override)
+    default_db = 'sqlite:///' + os.path.join(app.instance_path, 'sh.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # GitHub OAuth configuration

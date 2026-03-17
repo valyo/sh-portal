@@ -1,9 +1,32 @@
-"""Sales management: list, filter, stats, and andel-only view."""
+"""Sales management: list, filter, stats, and andel-only view.
+
+The sales list is loaded from the database on every request (no server-side cache).
+To avoid stale data, the list response is sent with Cache-Control: no-store so the
+browser does not cache it. After changing data elsewhere (e.g. deleting rows in the DB
+or marking invoices paid/unpaid), refresh the page to see the current state.
+"""
+import json
+import os
 from datetime import datetime
-from flask import Blueprint, render_template, redirect, url_for, session, request, flash
+from flask import Blueprint, current_app, render_template, redirect, url_for, session, request, flash, make_response
 from .models import Sale, SaleCategory, Product, Customer
+from .utils import normalize_customer_name
 from . import db
 from sqlalchemy import func
+
+
+def _get_sqlite_db_path():
+    """Return the resolved absolute path of the SQLite DB file, or None if not SQLite."""
+    uri = current_app.config.get('SQLALCHEMY_DATABASE_URI') or ''
+    if not uri.startswith('sqlite'):
+        return None
+    # sqlite:///app.db -> path is /app.db (leading slash); sqlite:///./instance/sh.db -> /./instance/sh.db
+    from urllib.parse import urlparse
+    parsed = urlparse(uri)
+    path = (parsed.path or '').lstrip('/')
+    if not path or path == ':memory:':
+        return ':memory:'
+    return os.path.abspath(path)
 
 sales_bp = Blueprint('sales', __name__)
 
@@ -85,7 +108,10 @@ def list_sales():
     )
     by_cat = [{'name': r[0], 'revenue': float(r[1] or 0), 'count': r[2]} for r in by_cat_rows]
 
-    return render_template(
+    customers_json = json.dumps([{'id': c.id, 'name': c.name, 'email': c.email} for c in customers])
+    db_path = _get_sqlite_db_path()
+
+    response = make_response(render_template(
         'sales.html',
         sales=sales,
         categories=categories,
@@ -100,8 +126,13 @@ def list_sales():
         stats_by_year=by_year,
         stats_by_category=by_cat,
         customers=customers,
+        customers_json=customers_json,
+        database_path=db_path,
         user=session.get('user'),
-    )
+    ))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @sales_bp.route('/sales/create', methods=['POST'])
@@ -112,14 +143,15 @@ def create_sale():
     date_str = request.form.get('timestamp')
     product_id = request.form.get('product_id', type=int)
     skord = (request.form.get('skord') or '').strip()
-    burk = (request.form.get('burk') or '').strip() or None
+    burk_kg = request.form.get('burk_kg', type=float)
     unit_price = request.form.get('unit_price', type=float)
     quantity = request.form.get('quantity', type=int)
     consistency = (request.form.get('consistency') or 'fast').strip()
     apiary = (request.form.get('apiary') or 'Solberg').strip()
     category_id = request.form.get('category_id', type=int)
     customer_id = request.form.get('customer_id', type=int) or None
-    customer_name = (request.form.get('customer_name') or '').strip() or None
+    raw_name = (request.form.get('customer_name') or '').strip() or None
+    customer_name = normalize_customer_name(raw_name) if raw_name and not customer_id else None
 
     errors = []
     if not date_str:
@@ -154,7 +186,7 @@ def create_sale():
         timestamp=ts,
         product_id=product_id,
         skord=skord,
-        burk=burk,
+        burk_kg=burk_kg,
         unit_price=unit_price,
         quantity=quantity,
         consistency=consistency,

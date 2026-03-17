@@ -55,13 +55,12 @@ def create_new_admin(
 
 
 def _normalize_customer_name(s):
-    """Trim and collapse multiple spaces. Apply small curation (e.g. fix double space, consistent casing for known cases)."""
-    if not s or not s.strip():
-        return None
-    s = " ".join(s.split()).strip()
-    if s.lower() == "jonny flygare":
-        s = "Jonny Flygare"
-    return s or None
+    """Use shared normalizer for consistent customer names (trim, collapse spaces, title-case)."""
+    from sh_portal.utils import normalize_customer_name
+    out = normalize_customer_name(s)
+    if out and out.lower() == "jonny flygare":
+        return "Jonny Flygare"
+    return out
 
 
 def _parse_price(s):
@@ -76,10 +75,11 @@ def _parse_price(s):
 
 
 def _parse_kg(s):
-    """Parse burk/kg string like '2.55 kg' to float or return None. Empty string -> None."""
+    """Parse burk string like '2.55 kg' or '2.5' to float (kg) or return None. Empty string -> None."""
     if not s or not s.strip():
         return None
-    m = re.match(r"^([\d,.]+)\s*kg\s*$", s.strip(), re.IGNORECASE)
+    s = s.strip()
+    m = re.match(r"^([\d,.]+)\s*(?:kg\s*)?$", s, re.IGNORECASE)
     if m:
         try:
             return float(m.group(1).replace(",", "."))
@@ -135,7 +135,7 @@ def import_sales(csv_path, dry_run):
                     skord = str(ts.year)
 
                 burk_raw = row[col.get("burk", 3)].strip() if col.get("burk", 3) < len(row) else ""
-                burk = burk_raw if burk_raw else None
+                burk_kg = _parse_kg(burk_raw) if burk_raw else None
 
                 antal_s = row[col["antal"]].strip() if col["antal"] < len(row) else ""
                 try:
@@ -192,7 +192,7 @@ def import_sales(csv_path, dry_run):
                     timestamp=ts,
                     product_id=product.id,
                     skord=skord,
-                    burk=burk,
+                    burk_kg=burk_kg,
                     unit_price=unit_price,
                     quantity=quantity,
                     consistency=consistency,

@@ -180,7 +180,7 @@ class Sale(db.Model):
     timestamp = db.Column(db.DateTime, nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     skord = db.Column(db.String(20), nullable=False)  # harvest year or "okänd"
-    burk = db.Column(db.String(30), nullable=True)  # e.g. "2.55 kg"
+    burk_kg = db.Column(db.Float, nullable=True)  # jar size in kg (unit always kg)
     unit_price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     consistency = db.Column(db.String(20), nullable=False, default='fast')  # fast, flytande, fryst

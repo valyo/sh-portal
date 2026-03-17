@@ -125,7 +125,7 @@
                                     <td>{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '—' }}</td>
                                     <td>{{ s.product.name if s.product else '—' }}</td>
                                     <td>{{ s.skord }}</td>
-                                    <td>{{ s.burk or '—' }}</td>
+                                    <td>{% if s.burk_kg is not none %}{{ "%.2f"|format(s.burk_kg) }} kg{% else %}—{% endif %}</td>
                                     <td>{{ s.quantity }}</td>
                                     <td>{{ "%.2f"|format(s.unit_price) }} kr</td>
                                     <td>{{ "%.2f"|format(s.total_price) }} kr</td>
@@ -139,6 +139,10 @@
                             </tbody>
                         </table>
                     </div>
+                    <p class="small text-muted mb-0 mt-2">The list is loaded from the database each time you open or refresh this page. After deleting sales elsewhere or changing invoice payment status, refresh the page to see the current data.</p>
+                    {% if database_path %}
+                    <p class="small text-muted mb-0 mt-1"><strong>Database file this app is using:</strong> <code title="Use this path when editing the DB directly">{{ database_path }}</code></p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -173,8 +177,9 @@
                                 <input type="text" class="form-control" id="sale_skord" name="skord" placeholder="e.g. 2024 or okänd" maxlength="20" required>
                             </div>
                             <div class="col-md-4">
-                                <label for="sale_burk" class="form-label">Burk</label>
-                                <input type="text" class="form-control" id="sale_burk" name="burk" placeholder="e.g. 2.55 kg" maxlength="30">
+                                <label for="sale_burk_kg" class="form-label">Burk (kg)</label>
+                                <input type="number" class="form-control" id="sale_burk_kg" name="burk_kg" placeholder="e.g. 2.5" step="0.01" min="0">
+                                <small class="text-muted">Jar size in kg. Leave empty if not applicable.</small>
                             </div>
                             <div class="col-md-4">
                                 <label for="sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
@@ -205,19 +210,13 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label for="sale_customer_id" class="form-label">Portal customer</label>
-                                <select class="form-select" id="sale_customer_id" name="customer_id">
-                                    <option value="">— None / use name below —</option>
-                                    {% for cust in customers %}
-                                    <option value="{{ cust.id }}">{{ cust.name }} ({{ cust.email }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
                             <div class="col-12">
-                                <label for="sale_customer_name" class="form-label">Customer name (free text)</label>
-                                <input type="text" class="form-control" id="sale_customer_name" name="customer_name" placeholder="If not a portal customer, enter name here" maxlength="200">
-                                <small class="text-muted">Leave blank if you selected a portal customer above.</small>
+                                <label for="sale_customer_name" class="form-label">Customer</label>
+                                <input type="text" class="form-control" id="sale_customer_name" name="customer_name" placeholder="Type to search existing customers or enter a new name" maxlength="200" autocomplete="off">
+                                <div id="sale_customer_suggestions" class="list-group border shadow-sm d-none" style="position: fixed; z-index: 1060; max-height: 220px; overflow-y: auto; min-width: 200px;"></div>
+                                <input type="hidden" id="sale_customer_id" name="customer_id" value="">
+                                <small class="text-muted">Start typing to pick an existing customer (avoids typos). Or type a new name for one-off sales.</small>
+                                <div id="sale_customer_normalized_hint" class="small text-success mt-1 d-none"></div>
                             </div>
                         </div>
                     </div>
@@ -230,12 +229,165 @@
         </div>
     </div>
     <script>
-    document.getElementById('saleCreateModal').addEventListener('show.bs.modal', function () {
-        var dateEl = document.getElementById('sale_timestamp');
-        if (dateEl && !dateEl.value) {
-            var d = new Date();
-            dateEl.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    (function() {
+        var customersRaw = {{ customers_json|safe }};
+        var customers = customersRaw.map(function(c) {
+            return { id: c.id, name: c.name, email: c.email, search: (c.name + ' ' + c.email).toLowerCase() };
+        });
+
+        document.getElementById('saleCreateModal').addEventListener('show.bs.modal', function () {
+            var dateEl = document.getElementById('sale_timestamp');
+            if (dateEl && !dateEl.value) {
+                var d = new Date();
+                dateEl.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            }
+            document.getElementById('sale_customer_name').value = '';
+            document.getElementById('sale_customer_id').value = '';
+            document.getElementById('sale_customer_suggestions').classList.add('d-none');
+            var h = document.getElementById('sale_customer_normalized_hint');
+            if (h) { h.classList.add('d-none'); h.textContent = ''; }
+            currentMatches = [];
+            highlightedIndex = -1;
+        });
+
+        var nameEl = document.getElementById('sale_customer_name');
+        var idEl = document.getElementById('sale_customer_id');
+        var listEl = document.getElementById('sale_customer_suggestions');
+        var currentMatches = [];
+        var highlightedIndex = -1;
+
+        function selectCustomer(c) {
+            idEl.value = c.id;
+            nameEl.value = c.name;
+            listEl.classList.add('d-none');
+            listEl.innerHTML = '';
+            currentMatches = [];
+            highlightedIndex = -1;
+            updateNormalizedHint();
         }
-    });
+
+        function positionDropdown() {
+            var rect = nameEl.getBoundingClientRect();
+            listEl.style.top = rect.bottom + 'px';
+            listEl.style.left = rect.left + 'px';
+            listEl.style.width = Math.max(rect.width, 280) + 'px';
+        }
+
+        function showSuggestions(q) {
+            listEl.innerHTML = '';
+            currentMatches = [];
+            highlightedIndex = -1;
+            var ql = (q || '').toLowerCase().trim();
+            var matches = ql.length > 0
+                ? customers.filter(function(c) { return c.search.indexOf(ql) !== -1; }).slice(0, 10)
+                : customers.slice(0, 10);
+            currentMatches = matches;
+            positionDropdown();
+            if (matches.length === 0) {
+                var msg = document.createElement('div');
+                msg.className = 'list-group-item text-muted small';
+                msg.textContent = customers.length === 0 ? 'No customers in database.' : 'No matching customers.';
+                listEl.appendChild(msg);
+                listEl.classList.remove('d-none');
+                return;
+            }
+            matches.forEach(function(c, i) {
+                var a = document.createElement('a');
+                a.href = '#';
+                a.className = 'list-group-item list-group-item-action' + (i === 0 ? ' active' : '');
+                a.textContent = c.name + ' (' + c.email + ')';
+                a.dataset.id = c.id;
+                a.dataset.name = c.name;
+                a.dataset.index = i;
+                a.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectCustomer(c);
+                });
+                listEl.appendChild(a);
+            });
+            highlightedIndex = 0;
+            listEl.classList.remove('d-none');
+        }
+
+        function clearSelectedCustomer() {
+            idEl.value = '';
+        }
+
+        function normalizeNameForDisplay(s) {
+            if (!s || typeof s !== 'string') return '';
+            return s.split(/\s+/).filter(Boolean).map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }).join(' ');
+        }
+
+        function updateNormalizedHint() {
+            var hintEl = document.getElementById('sale_customer_normalized_hint');
+            if (!hintEl) return;
+            if (idEl.value) {
+                hintEl.classList.add('d-none');
+                hintEl.textContent = '';
+                return;
+            }
+            var raw = (nameEl.value || '').trim();
+            if (!raw) {
+                hintEl.classList.add('d-none');
+                hintEl.textContent = '';
+                return;
+            }
+            var normalized = normalizeNameForDisplay(raw);
+            if (normalized) {
+                hintEl.textContent = 'Will be saved as: ' + normalized;
+                hintEl.classList.remove('d-none');
+            } else {
+                hintEl.classList.add('d-none');
+            }
+        }
+
+        nameEl.addEventListener('input', function() {
+            clearSelectedCustomer();
+            showSuggestions(this.value);
+            updateNormalizedHint();
+        });
+        nameEl.addEventListener('focus', function() {
+            showSuggestions(this.value);
+        });
+        nameEl.addEventListener('keydown', function(e) {
+            if (currentMatches.length === 0) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
+                listEl.children[highlightedIndex].classList.add('active');
+                for (var i = 0; i < listEl.children.length; i++) {
+                    if (i !== highlightedIndex) listEl.children[i].classList.remove('active');
+                }
+                listEl.children[highlightedIndex].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedIndex = highlightedIndex <= 0 ? currentMatches.length - 1 : highlightedIndex - 1;
+                listEl.children[highlightedIndex].classList.add('active');
+                for (var i = 0; i < listEl.children.length; i++) {
+                    if (i !== highlightedIndex) listEl.children[i].classList.remove('active');
+                }
+                listEl.children[highlightedIndex].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (e.key === 'Enter' && highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
+                e.preventDefault();
+                selectCustomer(currentMatches[highlightedIndex]);
+            }
+        });
+        nameEl.addEventListener('blur', function() {
+            setTimeout(function() { listEl.classList.add('d-none'); }, 150);
+        });
+        listEl.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+        });
+        document.addEventListener('click', function(e) {
+            if (!listEl.contains(e.target) && e.target !== nameEl) {
+                listEl.classList.add('d-none');
+            }
+        });
+    })();
     </script>
 {% endblock %}
