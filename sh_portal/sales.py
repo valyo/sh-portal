@@ -1,6 +1,7 @@
 """Sales management: list, filter, stats, and andel-only view."""
-from flask import Blueprint, render_template, redirect, url_for, session, request
-from .models import Sale, SaleCategory, Product
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, url_for, session, request, flash
+from .models import Sale, SaleCategory, Product, Customer
 from . import db
 from sqlalchemy import func
 
@@ -36,6 +37,7 @@ def list_sales():
 
     categories = SaleCategory.query.order_by(SaleCategory.name).all()
     products = Product.query.order_by(Product.name).all()
+    customers = Customer.query.order_by(Customer.name).all()
 
     years = db.session.query(func.strftime('%Y', Sale.timestamp).label('y')).distinct().order_by('y').all()
     years = [r[0] for r in years if r[0]]
@@ -97,5 +99,72 @@ def list_sales():
         total_count=total_count,
         stats_by_year=by_year,
         stats_by_category=by_cat,
+        customers=customers,
         user=session.get('user'),
     )
+
+
+@sales_bp.route('/sales/create', methods=['POST'])
+def create_sale():
+    if not session.get('user'):
+        return redirect(url_for('main.home'))
+
+    date_str = request.form.get('timestamp')
+    product_id = request.form.get('product_id', type=int)
+    skord = (request.form.get('skord') or '').strip()
+    burk = (request.form.get('burk') or '').strip() or None
+    unit_price = request.form.get('unit_price', type=float)
+    quantity = request.form.get('quantity', type=int)
+    consistency = (request.form.get('consistency') or 'fast').strip()
+    apiary = (request.form.get('apiary') or 'Solberg').strip()
+    category_id = request.form.get('category_id', type=int)
+    customer_id = request.form.get('customer_id', type=int) or None
+    customer_name = (request.form.get('customer_name') or '').strip() or None
+
+    errors = []
+    if not date_str:
+        errors.append('Date is required.')
+    if not product_id:
+        errors.append('Product is required.')
+    if not skord:
+        errors.append('Skörd is required.')
+    if unit_price is None:
+        errors.append('Unit price is required.')
+    if quantity is None or quantity < 1:
+        errors.append('Quantity must be at least 1.')
+    if consistency not in ('fast', 'flytande', 'fryst'):
+        errors.append('Consistency must be fast, flytande, or fryst.')
+    if not apiary:
+        errors.append('Apiary is required.')
+    if not category_id:
+        errors.append('Category is required.')
+
+    if errors:
+        for msg in errors:
+            flash(msg, 'error')
+        return redirect(url_for('sales.list_sales'))
+
+    try:
+        ts = datetime.strptime(date_str, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        flash('Invalid date format.', 'error')
+        return redirect(url_for('sales.list_sales'))
+
+    sale = Sale(
+        timestamp=ts,
+        product_id=product_id,
+        skord=skord,
+        burk=burk,
+        unit_price=unit_price,
+        quantity=quantity,
+        consistency=consistency,
+        apiary=apiary,
+        category_id=category_id,
+        customer_id=customer_id,
+        customer_name=customer_name if not customer_id else None,
+        invoice_id=None,
+    )
+    db.session.add(sale)
+    db.session.commit()
+    flash('Sale created successfully.', 'success')
+    return redirect(url_for('sales.list_sales'))
