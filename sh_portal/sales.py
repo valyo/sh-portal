@@ -54,9 +54,11 @@ def list_sales():
     category_id = request.args.get('category_id', type=int)
     product_id = request.args.get('product_id', type=int)
     andel_only = request.args.get('andel_only') == '1'
+    show_list = request.args.get('list') == '1'
 
     query = _build_sales_query(year=year, category_id=category_id, product_id=product_id, andel_only=andel_only)
-    sales = query.order_by(Sale.timestamp.desc()).all()
+    # Load full sales list only when user clicks "List sales" to avoid heavy queries by default
+    sales = query.order_by(Sale.timestamp.desc()).all() if show_list else []
 
     categories = SaleCategory.query.order_by(SaleCategory.name).all()
     products = Product.query.order_by(Product.name).all()
@@ -128,6 +130,7 @@ def list_sales():
         customers=customers,
         customers_json=customers_json,
         database_path=db_path,
+        show_list=show_list,
         user=session.get('user'),
     ))
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
