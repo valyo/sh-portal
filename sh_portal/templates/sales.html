@@ -3,6 +3,17 @@
 {% block title %}Sales - SH Portal{% endblock %}
 
 {% block content %}
+<style>
+.table-sales-list-wrapper { max-height: min(70vh, 600px); overflow-y: auto; }
+.table-sales-list thead th.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    box-shadow: 0 1px 0 0 #dee2e6;
+}
+</style>
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -59,42 +70,64 @@
             </div>
 
             <div class="card mb-3">
-                <div class="card-header py-2">
+                <div class="card-header py-2 d-flex align-items-center flex-wrap gap-2">
                     <strong>Sales stats</strong>
-                    {% if andel_only %}<span class="badge bg-success ms-2">Andel only</span>{% endif %}
+                    {% if andel_only %}<span class="badge bg-success">Andel only</span>{% endif %}
                     {% if selected_year or selected_category_id or selected_product_id %}
-                    <span class="text-muted small ms-2">(filtered)</span>
+                    <span class="badge bg-light text-dark">Filtered</span>
                     {% endif %}
                 </div>
-                <div class="card-body py-2">
-                    <div class="row">
-                        <div class="col-auto">
-                            <strong>Total revenue</strong> {{ "%.2f"|format(total_revenue) }} kr
+                <div class="card-body">
+                    <div class="row g-3 mb-0">
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 rounded bg-light border border-opacity-25">
+                                <div class="small text-muted text-uppercase">Total revenue</div>
+                                <div class="fs-4 fw-bold">{{ "{:,.2f}".format(total_revenue)|replace(",", " ") }} kr</div>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <strong>Sales</strong> {{ total_count }}
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 rounded bg-light border border-opacity-25">
+                                <div class="small text-muted text-uppercase">Sales</div>
+                                <div class="fs-4 fw-bold">{{ "{:,}".format(total_count)|replace(",", " ") }}</div>
+                            </div>
                         </div>
                     </div>
                     {% if stats_by_year or stats_by_category %}
-                    <div class="row mt-2 g-3">
+                    <div class="row g-3 mt-1">
                         {% if stats_by_year %}
-                        <div class="col-12 col-md-6">
-                            <strong class="small text-muted">By year</strong>
-                            <ul class="list-unstyled mb-0 small">
-                                {% for r in stats_by_year %}
-                                <li>{{ r.year }}: {{ "%.2f"|format(r.revenue) }} kr ({{ r.count }} sales)</li>
-                                {% endfor %}
-                            </ul>
+                        <div class="col-12 col-lg-6">
+                            <h6 class="text-muted small text-uppercase mb-2">By year</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tbody>
+                                        {% for r in stats_by_year %}
+                                        <tr>
+                                            <td>{{ r.year }}</td>
+                                            <td class="text-end">{{ "{:,.2f}".format(r.revenue)|replace(",", " ") }} kr</td>
+                                            <td class="text-end text-muted">{{ r.count }} st</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                         {% endif %}
                         {% if stats_by_category %}
-                        <div class="col-12 col-md-6">
-                            <strong class="small text-muted">By category</strong>
-                            <ul class="list-unstyled mb-0 small">
-                                {% for r in stats_by_category %}
-                                <li>{{ r.name }}: {{ "%.2f"|format(r.revenue) }} kr ({{ r.count }} sales)</li>
-                                {% endfor %}
-                            </ul>
+                        <div class="col-12 col-lg-6">
+                            <h6 class="text-muted small text-uppercase mb-2">By category</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tbody>
+                                        {% for r in stats_by_category %}
+                                        <tr>
+                                            <td>{{ r.name }}</td>
+                                            <td class="text-end">{{ "{:,.2f}".format(r.revenue)|replace(",", " ") }} kr</td>
+                                            <td class="text-end text-muted">{{ r.count }} st</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                         {% endif %}
                     </div>
@@ -109,20 +142,20 @@
                         <strong>Sales list</strong>
                         <a href="{{ url_for('sales.list_sales', year=selected_year, category_id=selected_category_id, product_id=selected_product_id, andel_only='1' if andel_only else '') }}" class="btn btn-sm btn-outline-secondary">Hide list</a>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm">
-                            <thead>
+                    <div class="table-responsive table-sales-list-wrapper">
+                        <table class="table table-hover table-sm table-sales-list">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Product</th>
-                                    <th>Skörd</th>
-                                    <th>Burk</th>
-                                    <th>Qty</th>
-                                    <th>Unit price</th>
-                                    <th>Total</th>
-                                    <th>Category</th>
-                                    <th>Customer</th>
-                                    <th>From invoice</th>
+                                    <th class="sticky-top">Date</th>
+                                    <th class="sticky-top">Product</th>
+                                    <th class="sticky-top">Skörd</th>
+                                    <th class="sticky-top">Burk</th>
+                                    <th class="sticky-top">Qty</th>
+                                    <th class="sticky-top">Unit price</th>
+                                    <th class="sticky-top">Total</th>
+                                    <th class="sticky-top">Category</th>
+                                    <th class="sticky-top">Customer</th>
+                                    <th class="sticky-top">From invoice</th>
                                 </tr>
                             </thead>
                             <tbody>
