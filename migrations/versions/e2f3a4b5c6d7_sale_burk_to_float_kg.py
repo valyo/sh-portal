@@ -9,6 +9,7 @@ import re
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 
 revision = 'e2f3a4b5c6d7'
@@ -31,21 +32,40 @@ def _parse_kg(s):
     return None
 
 
+def _has_column(conn, table, column):
+    """Return True if table has the given column (SQLite). PRAGMA table_info does not support bound params for table name."""
+    # Table name must be literal; we only use this for 'sales' in this migration.
+    r = conn.execute(text(f'PRAGMA table_info("{table}")'))
+    return any(row[1] == column for row in r)
+
+
 def upgrade():
-    with op.batch_alter_table('sales') as batch:
-        batch.add_column(sa.Column('burk_kg', sa.Float(), nullable=True))
-
     conn = op.get_bind()
-    # Backfill from old burk (string) to burk_kg (float)
-    result = conn.execute(text("SELECT id, burk FROM sales WHERE burk IS NOT NULL AND burk != ''"))
-    for row in result:
-        sid, burk_str = row[0], row[1]
-        val = _parse_kg(burk_str) if burk_str else None
-        if val is not None:
-            conn.execute(text("UPDATE sales SET burk_kg = :v WHERE id = :id"), {"v": val, "id": sid})
+    has_burk_kg = _has_column(conn, "sales", "burk_kg")
+    has_burk = _has_column(conn, "sales", "burk")
 
-    with op.batch_alter_table('sales') as batch:
-        batch.drop_column('burk')
+    if not has_burk_kg:
+        try:
+            with op.batch_alter_table('sales') as batch:
+                batch.add_column(sa.Column('burk_kg', sa.Float(), nullable=True))
+        except OperationalError as e:
+            err = getattr(e, "orig", e)
+            if "duplicate column name" not in str(err).lower():
+                raise
+            # Column already exists (e.g. from db.create_all()); skip
+
+    # Backfill from old burk (string) to burk_kg (float) only if burk exists
+    if has_burk:
+        result = conn.execute(text("SELECT id, burk FROM sales WHERE burk IS NOT NULL AND burk != ''"))
+        for row in result:
+            sid, burk_str = row[0], row[1]
+            val = _parse_kg(burk_str) if burk_str else None
+            if val is not None:
+                conn.execute(text("UPDATE sales SET burk_kg = :v WHERE id = :id"), {"v": val, "id": sid})
+
+    if has_burk:
+        with op.batch_alter_table('sales') as batch:
+            batch.drop_column('burk')
 
 
 def downgrade():
