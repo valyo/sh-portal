@@ -1,0 +1,628 @@
+{% extends "base.html" %}
+
+{% block title %}Sales - SH Portal{% endblock %}
+
+{% block content %}
+<style>
+.table-sales-list-wrapper { max-height: min(70vh, 600px); overflow-y: auto; }
+.table-sales-list thead th.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    box-shadow: 0 1px 0 0 #dee2e6;
+}
+</style>
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Sales</h1>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#saleCreateModal">
+                    <i class="bi bi-plus-lg"></i> New sale
+                </button>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="get" action="{{ url_for('sales.list_sales') }}" class="row g-2 align-items-end">
+                        {% if show_list %}<input type="hidden" name="list" value="1">{% endif %}
+                        <div class="col-auto">
+                            <label for="year" class="form-label">Year</label>
+                            <select name="year" id="year" class="form-select form-select-sm">
+                                <option value="">All</option>
+                                {% for y in years %}
+                                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label for="category_id" class="form-label">Category</label>
+                            <select name="category_id" id="category_id" class="form-select form-select-sm">
+                                <option value="">All</option>
+                                {% for c in categories %}
+                                <option value="{{ c.id }}" {% if selected_category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label for="product_id" class="form-label">Product</label>
+                            <select name="product_id" id="product_id" class="form-select form-select-sm">
+                                <option value="">All</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}" {% if selected_product_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="andel_only" id="andel_only" value="1" {% if andel_only %}checked{% endif %}>
+                                <label class="form-check-label" for="andel_only">Andel only</label>
+                            </div>
+                            <small class="text-muted d-block">Sales from paid invoices</small>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+                            <a href="{{ url_for('sales.list_sales') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header py-2 d-flex align-items-center flex-wrap gap-2">
+                    <strong>Sales stats</strong>
+                    {% if andel_only %}<span class="badge bg-success">Andel only</span>{% endif %}
+                    {% if selected_year or selected_category_id or selected_product_id %}
+                    <span class="badge bg-light text-dark">Filtered</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-0">
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 rounded bg-light border border-opacity-25">
+                                <div class="small text-muted text-uppercase">Total revenue</div>
+                                <div class="fs-4 fw-bold">{{ "{:,.2f}".format(total_revenue)|replace(",", " ") }} kr</div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 rounded bg-light border border-opacity-25">
+                                <div class="small text-muted text-uppercase">Sales</div>
+                                <div class="fs-4 fw-bold">{{ "{:,}".format(total_count)|replace(",", " ") }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% if stats_by_year or stats_by_category %}
+                    <div class="row g-3 mt-1">
+                        {% if stats_by_year %}
+                        <div class="col-12 col-lg-6">
+                            <h6 class="text-muted small text-uppercase mb-2">By year</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tbody>
+                                        {% for r in stats_by_year %}
+                                        <tr>
+                                            <td>{{ r.year }}</td>
+                                            <td class="text-end">{{ "{:,.2f}".format(r.revenue)|replace(",", " ") }} kr</td>
+                                            <td class="text-end text-muted">{{ r.count }} st</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if stats_by_category %}
+                        <div class="col-12 col-lg-6">
+                            <h6 class="text-muted small text-uppercase mb-2">By category</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tbody>
+                                        {% for r in stats_by_category %}
+                                        <tr>
+                                            <td>{{ r.name }}</td>
+                                            <td class="text-end">{{ "{:,.2f}".format(r.revenue)|replace(",", " ") }} kr</td>
+                                            <td class="text-end text-muted">{{ r.count }} st</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    {% if show_list %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>Sales list</strong>
+                        <a href="{{ url_for('sales.list_sales', year=selected_year, category_id=selected_category_id, product_id=selected_product_id, andel_only='1' if andel_only else '') }}" class="btn btn-sm btn-outline-secondary">Hide list</a>
+                    </div>
+                    <div class="table-responsive table-sales-list-wrapper">
+                        <table class="table table-hover table-sm table-sales-list">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="sticky-top">Date</th>
+                                    <th class="sticky-top">Product</th>
+                                    <th class="sticky-top">Skörd</th>
+                                    <th class="sticky-top">Burk</th>
+                                    <th class="sticky-top">Qty</th>
+                                    <th class="sticky-top">Unit price</th>
+                                    <th class="sticky-top">Total</th>
+                                    <th class="sticky-top">Category</th>
+                                    <th class="sticky-top">Customer</th>
+                                    <th class="sticky-top">From invoice</th>
+                                    <th class="sticky-top">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in sales %}
+                                <tr {% if not s.invoice_id %}data-sale-id="{{ s.id }}"
+                                    data-sale-date="{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '' }}"
+                                    data-sale-product-id="{{ s.product_id }}"
+                                    data-sale-skord="{{ s.skord or '' }}"
+                                    data-sale-burk-kg="{{ s.burk_kg if s.burk_kg is not none else '' }}"
+                                    data-sale-consistency="{{ s.consistency or 'fast' }}"
+                                    data-sale-unit-price="{{ s.unit_price }}"
+                                    data-sale-quantity="{{ s.quantity }}"
+                                    data-sale-apiary="{{ s.apiary or 'Solberg' }}"
+                                    data-sale-category-id="{{ s.category_id }}"
+                                    data-sale-customer-id="{{ s.customer_id or '' }}"
+                                    data-sale-customer-name="{{ s.display_customer if s.display_customer != '—' else '' }}"{% endif %}>
+                                    <td>{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '—' }}</td>
+                                    <td>{{ s.product.name if s.product else '—' }}</td>
+                                    <td>{{ s.skord }}</td>
+                                    <td>{% if s.burk_kg is not none %}{{ "%.2f"|format(s.burk_kg) }} kg{% else %}—{% endif %}</td>
+                                    <td>{{ s.quantity }}</td>
+                                    <td>{{ "%.2f"|format(s.unit_price) }} kr</td>
+                                    <td>{{ "%.2f"|format(s.total_price) }} kr</td>
+                                    <td><span class="badge bg-secondary">{{ s.category.name if s.category else '—' }}</span></td>
+                                    <td>{{ s.display_customer }}</td>
+                                    <td>{% if s.invoice_id %}<i class="bi bi-check-circle text-success" title="Andel invoice"></i>{% else %}—{% endif %}</td>
+                                    <td>
+                                        {% if not s.invoice_id %}
+                                        <button type="button" class="btn btn-sm btn-outline-primary sale-edit-btn" title="Edit">Edit</button>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="11" class="text-muted">No sales found. Import from CSV or mark andel invoices as paid.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2">The list is loaded from the database each time you open or refresh this page. After deleting sales elsewhere or changing invoice payment status, refresh the page to see the current data.</p>
+                    {% if database_path %}
+                    <p class="small text-muted mb-0 mt-1"><strong>Database file this app is using:</strong> <code title="Use this path when editing the DB directly">{{ database_path }}</code></p>
+                    {% endif %}
+                    {% else %}
+                    <p class="mb-0 text-muted">Stats above are for the current filters. Load the full sales table when you need it.</p>
+                    <a href="{{ url_for('sales.list_sales', year=selected_year, category_id=selected_category_id or '', product_id=selected_product_id or '', andel_only=andel_only, list=1) }}" class="btn btn-outline-primary mt-2">
+                        <i class="bi bi-list-ul"></i> List sales
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New sale modal -->
+    <div class="modal fade" id="saleCreateModal" tabindex="-1" aria-labelledby="saleCreateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saleCreateModalLabel">New sale</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{{ url_for('sales.create_sale') }}">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="sale_timestamp" class="form-label">Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="sale_timestamp" name="timestamp" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sale_product_id" class="form-label">Product <span class="text-danger">*</span></label>
+                                <select class="form-select" id="sale_product_id" name="product_id" required>
+                                    <option value="">— Select —</option>
+                                    {% for p in products %}
+                                    <option value="{{ p.id }}">{{ p.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="sale_skord" name="skord" placeholder="e.g. 2024 or okänd" maxlength="20" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_burk_kg" class="form-label">Burk (kg)</label>
+                                <input type="number" class="form-control" id="sale_burk_kg" name="burk_kg" placeholder="e.g. 2.5" step="0.01" min="0">
+                                <small class="text-muted">Jar size in kg. Leave empty if not applicable.</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
+                                <select class="form-select" id="sale_consistency" name="consistency">
+                                    <option value="fast">fast</option>
+                                    <option value="flytande">flytande</option>
+                                    <option value="fryst">fryst</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="sale_unit_price" name="unit_price" step="0.01" min="0" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="sale_quantity" name="quantity" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="sale_apiary" name="apiary" value="Solberg" maxlength="50" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sale_category_id" class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" id="sale_category_id" name="category_id" required>
+                                    <option value="">— Select —</option>
+                                    {% for c in categories %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="sale_customer_name" class="form-label">Customer</label>
+                                <input type="text" class="form-control" id="sale_customer_name" name="customer_name" placeholder="Type to search existing customers or enter a new name" maxlength="200" autocomplete="off">
+                                <div id="sale_customer_suggestions" class="list-group border shadow-sm d-none" style="position: fixed; z-index: 1060; max-height: 220px; overflow-y: auto; min-width: 200px;"></div>
+                                <input type="hidden" id="sale_customer_id" name="customer_id" value="">
+                                <small class="text-muted">Start typing to pick an existing customer (avoids typos). Or type a new name for one-off sales.</small>
+                                <div id="sale_customer_normalized_hint" class="small text-success mt-1 d-none"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create sale</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit sale modal -->
+    <div class="modal fade" id="saleEditModal" tabindex="-1" aria-labelledby="saleEditModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saleEditModalLabel">Edit sale</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="saleEditForm" method="post" action="">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="edit_sale_timestamp" class="form-label">Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="edit_sale_timestamp" name="timestamp" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_sale_product_id" class="form-label">Product <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_sale_product_id" name="product_id" required>
+                                    {% for p in products %}
+                                    <option value="{{ p.id }}">{{ p.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit_sale_skord" name="skord" maxlength="20" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_burk_kg" class="form-label">Burk (kg)</label>
+                                <input type="number" class="form-control" id="edit_sale_burk_kg" name="burk_kg" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_sale_consistency" name="consistency">
+                                    <option value="fast">fast</option>
+                                    <option value="flytande">flytande</option>
+                                    <option value="fryst">fryst</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit_sale_unit_price" name="unit_price" step="0.01" min="0" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit_sale_quantity" name="quantity" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit_sale_apiary" name="apiary" maxlength="50" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_sale_category_id" class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_sale_category_id" name="category_id" required>
+                                    {% for c in categories %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="edit_sale_customer_name" class="form-label">Customer</label>
+                                <input type="text" class="form-control" id="edit_sale_customer_name" name="customer_name" placeholder="Type to search or enter name" maxlength="200" autocomplete="off">
+                                <div id="edit_sale_customer_suggestions" class="list-group border shadow-sm d-none" style="position: fixed; z-index: 1060; max-height: 220px; overflow-y: auto; min-width: 200px;"></div>
+                                <input type="hidden" id="edit_sale_customer_id" name="customer_id" value="">
+                                <div id="edit_sale_customer_normalized_hint" class="small text-success mt-1 d-none"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer d-flex justify-content-between">
+                        <div>
+                            <button type="button" id="saleEditDeleteBtn" class="btn btn-outline-danger">Delete sale</button>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save changes</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <form id="saleDeleteForm" method="post" action="" style="display:none;"></form>
+    <script>
+    (function() {
+        var customersRaw = {{ customers_json|safe }};
+        var customers = customersRaw.map(function(c) {
+            return { id: c.id, name: c.name, email: c.email, search: (c.name + ' ' + c.email).toLowerCase() };
+        });
+
+        document.getElementById('saleCreateModal').addEventListener('show.bs.modal', function () {
+            var dateEl = document.getElementById('sale_timestamp');
+            if (dateEl && !dateEl.value) {
+                var d = new Date();
+                dateEl.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            }
+            document.getElementById('sale_customer_name').value = '';
+            document.getElementById('sale_customer_id').value = '';
+            document.getElementById('sale_customer_suggestions').classList.add('d-none');
+            var h = document.getElementById('sale_customer_normalized_hint');
+            if (h) { h.classList.add('d-none'); h.textContent = ''; }
+            currentMatches = [];
+            highlightedIndex = -1;
+        });
+
+        var nameEl = document.getElementById('sale_customer_name');
+        var idEl = document.getElementById('sale_customer_id');
+        var listEl = document.getElementById('sale_customer_suggestions');
+        var currentMatches = [];
+        var highlightedIndex = -1;
+
+        function selectCustomer(c) {
+            idEl.value = c.id;
+            nameEl.value = c.name;
+            listEl.classList.add('d-none');
+            listEl.innerHTML = '';
+            currentMatches = [];
+            highlightedIndex = -1;
+            updateNormalizedHint();
+        }
+
+        function positionDropdown() {
+            var rect = nameEl.getBoundingClientRect();
+            listEl.style.top = rect.bottom + 'px';
+            listEl.style.left = rect.left + 'px';
+            listEl.style.width = Math.max(rect.width, 280) + 'px';
+        }
+
+        function showSuggestions(q) {
+            listEl.innerHTML = '';
+            currentMatches = [];
+            highlightedIndex = -1;
+            var ql = (q || '').toLowerCase().trim();
+            var matches = ql.length > 0
+                ? customers.filter(function(c) { return c.search.indexOf(ql) !== -1; }).slice(0, 10)
+                : customers.slice(0, 10);
+            currentMatches = matches;
+            positionDropdown();
+            if (matches.length === 0) {
+                var msg = document.createElement('div');
+                msg.className = 'list-group-item text-muted small';
+                msg.textContent = customers.length === 0 ? 'No customers in database.' : 'No matching customers.';
+                listEl.appendChild(msg);
+                listEl.classList.remove('d-none');
+                return;
+            }
+            matches.forEach(function(c, i) {
+                var a = document.createElement('a');
+                a.href = '#';
+                a.className = 'list-group-item list-group-item-action' + (i === 0 ? ' active' : '');
+                a.textContent = c.name + ' (' + c.email + ')';
+                a.dataset.id = c.id;
+                a.dataset.name = c.name;
+                a.dataset.index = i;
+                a.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectCustomer(c);
+                });
+                listEl.appendChild(a);
+            });
+            highlightedIndex = 0;
+            listEl.classList.remove('d-none');
+        }
+
+        function clearSelectedCustomer() {
+            idEl.value = '';
+        }
+
+        function normalizeNameForDisplay(s) {
+            if (!s || typeof s !== 'string') return '';
+            return s.split(/\s+/).filter(Boolean).map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }).join(' ');
+        }
+
+        function updateNormalizedHint() {
+            var hintEl = document.getElementById('sale_customer_normalized_hint');
+            if (!hintEl) return;
+            if (idEl.value) {
+                hintEl.classList.add('d-none');
+                hintEl.textContent = '';
+                return;
+            }
+            var raw = (nameEl.value || '').trim();
+            if (!raw) {
+                hintEl.classList.add('d-none');
+                hintEl.textContent = '';
+                return;
+            }
+            var normalized = normalizeNameForDisplay(raw);
+            if (normalized) {
+                hintEl.textContent = 'Will be saved as: ' + normalized;
+                hintEl.classList.remove('d-none');
+            } else {
+                hintEl.classList.add('d-none');
+            }
+        }
+
+        nameEl.addEventListener('input', function() {
+            clearSelectedCustomer();
+            showSuggestions(this.value);
+            updateNormalizedHint();
+        });
+        nameEl.addEventListener('focus', function() {
+            showSuggestions(this.value);
+        });
+        nameEl.addEventListener('keydown', function(e) {
+            if (currentMatches.length === 0) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
+                listEl.children[highlightedIndex].classList.add('active');
+                for (var i = 0; i < listEl.children.length; i++) {
+                    if (i !== highlightedIndex) listEl.children[i].classList.remove('active');
+                }
+                listEl.children[highlightedIndex].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedIndex = highlightedIndex <= 0 ? currentMatches.length - 1 : highlightedIndex - 1;
+                listEl.children[highlightedIndex].classList.add('active');
+                for (var i = 0; i < listEl.children.length; i++) {
+                    if (i !== highlightedIndex) listEl.children[i].classList.remove('active');
+                }
+                listEl.children[highlightedIndex].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (e.key === 'Enter' && highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
+                e.preventDefault();
+                selectCustomer(currentMatches[highlightedIndex]);
+            }
+        });
+        nameEl.addEventListener('blur', function() {
+            setTimeout(function() { listEl.classList.add('d-none'); }, 150);
+        });
+        listEl.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+        });
+        document.addEventListener('click', function(e) {
+            if (!listEl.contains(e.target) && e.target !== nameEl) {
+                listEl.classList.add('d-none');
+            }
+        });
+
+        // Edit sale modal: open from row data and wire Delete button
+        var editModal = document.getElementById('saleEditModal');
+        var editForm = document.getElementById('saleEditForm');
+        var deleteForm = document.getElementById('saleDeleteForm');
+        var currentEditSaleId = null;
+
+        document.addEventListener('click', function(e) {
+            var editBtn = e.target.closest('.sale-edit-btn');
+            if (!editBtn) return;
+            e.preventDefault();
+            var row = editBtn.closest('tr');
+            if (!row || !row.dataset.saleId) return;
+            currentEditSaleId = row.dataset.saleId;
+            document.getElementById('edit_sale_timestamp').value = row.dataset.saleDate || '';
+            document.getElementById('edit_sale_product_id').value = row.dataset.saleProductId || '';
+            document.getElementById('edit_sale_skord').value = row.dataset.saleSkord || '';
+            document.getElementById('edit_sale_burk_kg').value = row.dataset.saleBurkKg || '';
+            document.getElementById('edit_sale_consistency').value = row.dataset.saleConsistency || 'fast';
+            document.getElementById('edit_sale_unit_price').value = row.dataset.saleUnitPrice || '';
+            document.getElementById('edit_sale_quantity').value = row.dataset.saleQuantity || '';
+            document.getElementById('edit_sale_apiary').value = row.dataset.saleApiary || 'Solberg';
+            document.getElementById('edit_sale_category_id').value = row.dataset.saleCategoryId || '';
+            document.getElementById('edit_sale_customer_id').value = row.dataset.saleCustomerId || '';
+            document.getElementById('edit_sale_customer_name').value = row.dataset.saleCustomerName || '';
+            document.getElementById('edit_sale_customer_suggestions').classList.add('d-none');
+            document.getElementById('edit_sale_customer_normalized_hint').classList.add('d-none');
+            editForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/edit';
+            deleteForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/delete';
+            var modal = new bootstrap.Modal(editModal);
+            modal.show();
+        });
+
+        document.getElementById('saleEditDeleteBtn').addEventListener('click', function() {
+            if (!currentEditSaleId) return;
+            if (!confirm('Delete this sale? This cannot be undone.')) return;
+            deleteForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/delete';
+            deleteForm.submit();
+        });
+
+        // Edit modal customer autocomplete
+        var editNameEl = document.getElementById('edit_sale_customer_name');
+        var editIdEl = document.getElementById('edit_sale_customer_id');
+        var editListEl = document.getElementById('edit_sale_customer_suggestions');
+        if (editNameEl && editListEl) {
+            function editPositionDropdown() {
+                var rect = editNameEl.getBoundingClientRect();
+                editListEl.style.top = rect.bottom + 'px';
+                editListEl.style.left = rect.left + 'px';
+                editListEl.style.width = Math.max(rect.width, 280) + 'px';
+            }
+            function editShowSuggestions(q) {
+                editListEl.innerHTML = '';
+                var ql = (q || '').toLowerCase().trim();
+                var matches = ql.length > 0
+                    ? customers.filter(function(c) { return c.search.indexOf(ql) !== -1; }).slice(0, 10)
+                    : customers.slice(0, 10);
+                editPositionDropdown();
+                if (matches.length === 0) {
+                    var msg = document.createElement('div');
+                    msg.className = 'list-group-item text-muted small';
+                    msg.textContent = customers.length === 0 ? 'No customers in database.' : 'No matching customers.';
+                    editListEl.appendChild(msg);
+                    editListEl.classList.remove('d-none');
+                    return;
+                }
+                matches.forEach(function(c) {
+                    var a = document.createElement('a');
+                    a.href = '#';
+                    a.className = 'list-group-item list-group-item-action';
+                    a.textContent = c.name + ' (' + c.email + ')';
+                    a.addEventListener('mousedown', function(ev) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        editIdEl.value = c.id;
+                        editNameEl.value = c.name;
+                        editListEl.classList.add('d-none');
+                        editListEl.innerHTML = '';
+                    });
+                    editListEl.appendChild(a);
+                });
+                editListEl.classList.remove('d-none');
+            }
+            editNameEl.addEventListener('input', function() { editIdEl.value = ''; editShowSuggestions(this.value); });
+            editNameEl.addEventListener('focus', function() { editShowSuggestions(this.value); });
+            editNameEl.addEventListener('blur', function() { setTimeout(function() { editListEl.classList.add('d-none'); }, 150); });
+            editListEl.addEventListener('mousedown', function(ev) { ev.preventDefault(); });
+        }
+    })();
+    </script>
+{% endblock %}

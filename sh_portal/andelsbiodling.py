@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
-from .models import Season, Bookings, Invoice
+from .models import Season, Bookings, Invoice, Sale, Product, SaleCategory
 from . import db
 import pandas as pd
 from datetime import datetime, timedelta
@@ -319,6 +319,37 @@ def send_invoices():
         current_app.logger.error(error_msg)
         return jsonify({'error': error_msg}), 500
 
+def create_sale_from_invoice(invoice):
+    """Create a Sale record when an andel invoice is marked as paid. Idempotent: no-op if sale already exists for this invoice."""
+    if hasattr(invoice, 'sale') and invoice.sale is not None:
+        return invoice.sale
+    product = Product.query.filter_by(name='solberg honung').first()
+    category = SaleCategory.query.filter_by(name='andel').first()
+    if not product or not category:
+        current_app.logger.warning('Cannot create sale from invoice: missing Product "solberg honung" or SaleCategory "andel".')
+        return None
+    booking = invoice.booking
+    season = invoice.season
+    unit_price = round(invoice.tot_sum / invoice.quantity, 2) if invoice.quantity else 0
+    sale_date = invoice.date_payed or datetime.utcnow()
+    sale = Sale(
+        timestamp=sale_date,
+        product_id=product.id,
+        skord=str(season.year) if season else 'okänd',
+        burk_kg=2.5,
+        unit_price=unit_price,
+        quantity=invoice.quantity,
+        consistency='fast',
+        apiary='Solberg',
+        category_id=category.id,
+        customer_id=booking.customer_id,
+        customer_name=None,
+        invoice_id=invoice.id,
+    )
+    db.session.add(sale)
+    return sale
+
+
 @andelsbiodling.route('/api/invoice/<int:invoice_id>/payment', methods=['POST'])
 def update_invoice_payment(invoice_id):
     if not session.get('user'):
@@ -328,12 +359,22 @@ def update_invoice_payment(invoice_id):
     if invoice is None:
         abort(404)
     date_paid = request.json.get('date_paid')
+    was_already_paid = invoice.date_payed is not None
 
     try:
         if date_paid:
             invoice.date_payed = datetime.strptime(date_paid, '%Y-%m-%d')
+            # Only create a sale when first marking as paid; do not recreate if the user
+            # had deleted the sale and then changes the payment date again.
+            if not was_already_paid:
+                create_sale_from_invoice(invoice)
+            elif hasattr(invoice, 'sale') and invoice.sale is not None:
+                # Update existing sale timestamp when payment date is changed
+                invoice.sale.timestamp = invoice.date_payed
         else:
             invoice.date_payed = None
+            if hasattr(invoice, 'sale') and invoice.sale is not None:
+                db.session.delete(invoice.sale)
 
         db.session.commit()
         flash('Invoice updated.', 'success')

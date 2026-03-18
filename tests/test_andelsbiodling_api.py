@@ -108,3 +108,69 @@ class TestSendInvoices:
         )
         assert rv.status_code == 400
         assert "not found" in rv.get_json().get("error", "").lower()
+
+
+class TestInvoicePayment:
+    """POST /api/invoice/<id>/payment"""
+
+    def test_unauthorized_returns_401(self, client, invoice):
+        rv = client.post(
+            f"/api/invoice/{invoice.id}/payment",
+            json={"date_paid": "2025-03-15"},
+            content_type="application/json",
+        )
+        assert rv.status_code == 401
+
+    def test_not_found_returns_404(self, logged_in_client):
+        rv = logged_in_client.post(
+            "/api/invoice/99999/payment",
+            json={"date_paid": "2025-03-15"},
+            content_type="application/json",
+        )
+        assert rv.status_code == 404
+
+    def test_mark_paid_creates_sale(self, logged_in_client, app, invoice, product, sale_category):
+        """First time marking invoice as paid creates a Sale (product and category must exist)."""
+        assert product.name == "solberg honung"
+        assert sale_category.name == "andel"
+        rv = logged_in_client.post(
+            f"/api/invoice/{invoice.id}/payment",
+            json={"date_paid": "2025-03-15"},
+            content_type="application/json",
+        )
+        assert rv.status_code == 200
+        assert rv.get_json().get("success") is True
+        with app.app_context():
+            from sh_portal.models import Sale, Invoice
+            from sh_portal import db
+            inv = db.session.get(Invoice, invoice.id)
+            assert inv.date_payed is not None
+            sales = Sale.query.filter_by(invoice_id=invoice.id).all()
+            assert len(sales) == 1
+            assert sales[0].quantity == invoice.quantity
+
+    def test_mark_paid_again_does_not_duplicate_sale(self, logged_in_client, app, invoice, product, sale_category):
+        """Marking already-paid invoice again (e.g. change date) does not create a second Sale."""
+        # First payment
+        logged_in_client.post(
+            f"/api/invoice/{invoice.id}/payment",
+            json={"date_paid": "2025-03-15"},
+            content_type="application/json",
+        )
+        with app.app_context():
+            from sh_portal.models import Sale
+            from sh_portal import db
+            count_after_first = Sale.query.filter_by(invoice_id=invoice.id).count()
+            assert count_after_first == 1
+        # Second request (e.g. user changes payment date)
+        rv = logged_in_client.post(
+            f"/api/invoice/{invoice.id}/payment",
+            json={"date_paid": "2025-03-20"},
+            content_type="application/json",
+        )
+        assert rv.status_code == 200
+        with app.app_context():
+            from sh_portal.models import Sale
+            from sh_portal import db
+            sales = Sale.query.filter_by(invoice_id=invoice.id).all()
+            assert len(sales) == 1

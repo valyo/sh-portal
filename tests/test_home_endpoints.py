@@ -12,6 +12,14 @@ class TestHome:
         rv = logged_in_client.get("/")
         assert rv.status_code == 200
 
+    def test_home_season_stats_includes_invoiced_and_paid(self, logged_in_client, season, booking, invoice):
+        """Current season stats include num_invoiced and num_paid when invoices exist."""
+        rv = logged_in_client.get("/")
+        assert rv.status_code == 200
+        # One invoice in this season
+        assert b"Invoiced" in rv.data or b"invoiced" in rv.data
+        assert b"Paid" in rv.data or b"paid" in rv.data
+
 
 class TestLogout:
     """GET /logout"""
