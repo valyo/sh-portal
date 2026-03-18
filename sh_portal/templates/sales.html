@@ -156,11 +156,23 @@
                                     <th class="sticky-top">Category</th>
                                     <th class="sticky-top">Customer</th>
                                     <th class="sticky-top">From invoice</th>
+                                    <th class="sticky-top">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for s in sales %}
-                                <tr>
+                                <tr {% if not s.invoice_id %}data-sale-id="{{ s.id }}"
+                                    data-sale-date="{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '' }}"
+                                    data-sale-product-id="{{ s.product_id }}"
+                                    data-sale-skord="{{ s.skord or '' }}"
+                                    data-sale-burk-kg="{{ s.burk_kg if s.burk_kg is not none else '' }}"
+                                    data-sale-consistency="{{ s.consistency or 'fast' }}"
+                                    data-sale-unit-price="{{ s.unit_price }}"
+                                    data-sale-quantity="{{ s.quantity }}"
+                                    data-sale-apiary="{{ s.apiary or 'Solberg' }}"
+                                    data-sale-category-id="{{ s.category_id }}"
+                                    data-sale-customer-id="{{ s.customer_id or '' }}"
+                                    data-sale-customer-name="{{ s.display_customer if s.display_customer != '—' else '' }}"{% endif %}>
                                     <td>{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '—' }}</td>
                                     <td>{{ s.product.name if s.product else '—' }}</td>
                                     <td>{{ s.skord }}</td>
@@ -171,9 +183,16 @@
                                     <td><span class="badge bg-secondary">{{ s.category.name if s.category else '—' }}</span></td>
                                     <td>{{ s.display_customer }}</td>
                                     <td>{% if s.invoice_id %}<i class="bi bi-check-circle text-success" title="Andel invoice"></i>{% else %}—{% endif %}</td>
+                                    <td>
+                                        {% if not s.invoice_id %}
+                                        <button type="button" class="btn btn-sm btn-outline-primary sale-edit-btn" title="Edit">Edit</button>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="10" class="text-muted">No sales found. Import from CSV or mark andel invoices as paid.</td></tr>
+                                <tr><td colspan="11" class="text-muted">No sales found. Import from CSV or mark andel invoices as paid.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -273,6 +292,89 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit sale modal -->
+    <div class="modal fade" id="saleEditModal" tabindex="-1" aria-labelledby="saleEditModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saleEditModalLabel">Edit sale</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="saleEditForm" method="post" action="">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="edit_sale_timestamp" class="form-label">Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="edit_sale_timestamp" name="timestamp" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_sale_product_id" class="form-label">Product <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_sale_product_id" name="product_id" required>
+                                    {% for p in products %}
+                                    <option value="{{ p.id }}">{{ p.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit_sale_skord" name="skord" maxlength="20" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_burk_kg" class="form-label">Burk (kg)</label>
+                                <input type="number" class="form-control" id="edit_sale_burk_kg" name="burk_kg" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_sale_consistency" name="consistency">
+                                    <option value="fast">fast</option>
+                                    <option value="flytande">flytande</option>
+                                    <option value="fryst">fryst</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit_sale_unit_price" name="unit_price" step="0.01" min="0" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit_sale_quantity" name="quantity" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit_sale_apiary" name="apiary" maxlength="50" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_sale_category_id" class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit_sale_category_id" name="category_id" required>
+                                    {% for c in categories %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="edit_sale_customer_name" class="form-label">Customer</label>
+                                <input type="text" class="form-control" id="edit_sale_customer_name" name="customer_name" placeholder="Type to search or enter name" maxlength="200" autocomplete="off">
+                                <div id="edit_sale_customer_suggestions" class="list-group border shadow-sm d-none" style="position: fixed; z-index: 1060; max-height: 220px; overflow-y: auto; min-width: 200px;"></div>
+                                <input type="hidden" id="edit_sale_customer_id" name="customer_id" value="">
+                                <div id="edit_sale_customer_normalized_hint" class="small text-success mt-1 d-none"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer d-flex justify-content-between">
+                        <div>
+                            <button type="button" id="saleEditDeleteBtn" class="btn btn-outline-danger">Delete sale</button>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save changes</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <form id="saleDeleteForm" method="post" action="" style="display:none;"></form>
     <script>
     (function() {
         var customersRaw = {{ customers_json|safe }};
@@ -433,6 +535,94 @@
                 listEl.classList.add('d-none');
             }
         });
+
+        // Edit sale modal: open from row data and wire Delete button
+        var editModal = document.getElementById('saleEditModal');
+        var editForm = document.getElementById('saleEditForm');
+        var deleteForm = document.getElementById('saleDeleteForm');
+        var currentEditSaleId = null;
+
+        document.addEventListener('click', function(e) {
+            var editBtn = e.target.closest('.sale-edit-btn');
+            if (!editBtn) return;
+            e.preventDefault();
+            var row = editBtn.closest('tr');
+            if (!row || !row.dataset.saleId) return;
+            currentEditSaleId = row.dataset.saleId;
+            document.getElementById('edit_sale_timestamp').value = row.dataset.saleDate || '';
+            document.getElementById('edit_sale_product_id').value = row.dataset.saleProductId || '';
+            document.getElementById('edit_sale_skord').value = row.dataset.saleSkord || '';
+            document.getElementById('edit_sale_burk_kg').value = row.dataset.saleBurkKg || '';
+            document.getElementById('edit_sale_consistency').value = row.dataset.saleConsistency || 'fast';
+            document.getElementById('edit_sale_unit_price').value = row.dataset.saleUnitPrice || '';
+            document.getElementById('edit_sale_quantity').value = row.dataset.saleQuantity || '';
+            document.getElementById('edit_sale_apiary').value = row.dataset.saleApiary || 'Solberg';
+            document.getElementById('edit_sale_category_id').value = row.dataset.saleCategoryId || '';
+            document.getElementById('edit_sale_customer_id').value = row.dataset.saleCustomerId || '';
+            document.getElementById('edit_sale_customer_name').value = row.dataset.saleCustomerName || '';
+            document.getElementById('edit_sale_customer_suggestions').classList.add('d-none');
+            document.getElementById('edit_sale_customer_normalized_hint').classList.add('d-none');
+            editForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/edit';
+            deleteForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/delete';
+            var modal = new bootstrap.Modal(editModal);
+            modal.show();
+        });
+
+        document.getElementById('saleEditDeleteBtn').addEventListener('click', function() {
+            if (!currentEditSaleId) return;
+            if (!confirm('Delete this sale? This cannot be undone.')) return;
+            deleteForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/delete';
+            deleteForm.submit();
+        });
+
+        // Edit modal customer autocomplete
+        var editNameEl = document.getElementById('edit_sale_customer_name');
+        var editIdEl = document.getElementById('edit_sale_customer_id');
+        var editListEl = document.getElementById('edit_sale_customer_suggestions');
+        if (editNameEl && editListEl) {
+            function editPositionDropdown() {
+                var rect = editNameEl.getBoundingClientRect();
+                editListEl.style.top = rect.bottom + 'px';
+                editListEl.style.left = rect.left + 'px';
+                editListEl.style.width = Math.max(rect.width, 280) + 'px';
+            }
+            function editShowSuggestions(q) {
+                editListEl.innerHTML = '';
+                var ql = (q || '').toLowerCase().trim();
+                var matches = ql.length > 0
+                    ? customers.filter(function(c) { return c.search.indexOf(ql) !== -1; }).slice(0, 10)
+                    : customers.slice(0, 10);
+                editPositionDropdown();
+                if (matches.length === 0) {
+                    var msg = document.createElement('div');
+                    msg.className = 'list-group-item text-muted small';
+                    msg.textContent = customers.length === 0 ? 'No customers in database.' : 'No matching customers.';
+                    editListEl.appendChild(msg);
+                    editListEl.classList.remove('d-none');
+                    return;
+                }
+                matches.forEach(function(c) {
+                    var a = document.createElement('a');
+                    a.href = '#';
+                    a.className = 'list-group-item list-group-item-action';
+                    a.textContent = c.name + ' (' + c.email + ')';
+                    a.addEventListener('mousedown', function(ev) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        editIdEl.value = c.id;
+                        editNameEl.value = c.name;
+                        editListEl.classList.add('d-none');
+                        editListEl.innerHTML = '';
+                    });
+                    editListEl.appendChild(a);
+                });
+                editListEl.classList.remove('d-none');
+            }
+            editNameEl.addEventListener('input', function() { editIdEl.value = ''; editShowSuggestions(this.value); });
+            editNameEl.addEventListener('focus', function() { editShowSuggestions(this.value); });
+            editNameEl.addEventListener('blur', function() { setTimeout(function() { editListEl.classList.add('d-none'); }, 150); });
+            editListEl.addEventListener('mousedown', function(ev) { ev.preventDefault(); });
+        }
     })();
     </script>
 {% endblock %}

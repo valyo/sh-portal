@@ -8,7 +8,7 @@ or marking invoices paid/unpaid), refresh the page to see the current state.
 import json
 import os
 from datetime import datetime
-from flask import Blueprint, current_app, render_template, redirect, url_for, session, request, flash, make_response
+from flask import Blueprint, current_app, render_template, redirect, url_for, session, request, flash, make_response, abort
 from .models import Sale, SaleCategory, Product, Customer
 from .utils import normalize_customer_name
 from . import db
@@ -202,4 +202,99 @@ def create_sale():
     db.session.add(sale)
     db.session.commit()
     flash('Sale created successfully.', 'success')
+    return redirect(url_for('sales.list_sales'))
+
+
+def _sale_form_data(request):
+    """Parse and return (timestamp, product_id, skord, burk_kg, ...) from request.form. Returns None for optional fields."""
+    date_str = request.form.get('timestamp')
+    product_id = request.form.get('product_id', type=int)
+    skord = (request.form.get('skord') or '').strip()
+    burk_kg = request.form.get('burk_kg', type=float)
+    unit_price = request.form.get('unit_price', type=float)
+    quantity = request.form.get('quantity', type=int)
+    consistency = (request.form.get('consistency') or 'fast').strip()
+    apiary = (request.form.get('apiary') or 'Solberg').strip()
+    category_id = request.form.get('category_id', type=int)
+    customer_id = request.form.get('customer_id', type=int) or None
+    raw_name = (request.form.get('customer_name') or '').strip() or None
+    customer_name = normalize_customer_name(raw_name) if raw_name and not customer_id else None
+    return (date_str, product_id, skord, burk_kg, unit_price, quantity, consistency, apiary, category_id, customer_id, customer_name)
+
+
+def _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id):
+    """Return list of error messages, or empty list if valid."""
+    errors = []
+    if not date_str:
+        errors.append('Date is required.')
+    if not product_id:
+        errors.append('Product is required.')
+    if not skord:
+        errors.append('Skörd is required.')
+    if unit_price is None:
+        errors.append('Unit price is required.')
+    if quantity is None or quantity < 1:
+        errors.append('Quantity must be at least 1.')
+    if consistency not in ('fast', 'flytande', 'fryst'):
+        errors.append('Consistency must be fast, flytande, or fryst.')
+    if not apiary:
+        errors.append('Apiary is required.')
+    if not category_id:
+        errors.append('Category is required.')
+    return errors
+
+
+@sales_bp.route('/sales/<int:sale_id>/edit', methods=['POST'])
+def edit_sale(sale_id):
+    if not session.get('user'):
+        return redirect(url_for('main.home'))
+    sale = db.session.get(Sale, sale_id)
+    if sale is None:
+        abort(404)
+    if sale.invoice_id is not None:
+        flash('Sales created from an invoice cannot be edited.', 'error')
+        return redirect(url_for('sales.list_sales'))
+
+    # Update from form
+    (date_str, product_id, skord, burk_kg, unit_price, quantity, consistency, apiary, category_id, customer_id, customer_name) = _sale_form_data(request)
+    errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
+    if errors:
+        for msg in errors:
+            flash(msg, 'error')
+        return redirect(url_for('sales.edit_sale', sale_id=sale_id))
+    try:
+        ts = datetime.strptime(date_str, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        flash('Invalid date format.', 'error')
+        return redirect(url_for('sales.edit_sale', sale_id=sale_id))
+
+    sale.timestamp = ts
+    sale.product_id = product_id
+    sale.skord = skord
+    sale.burk_kg = burk_kg
+    sale.unit_price = unit_price
+    sale.quantity = quantity
+    sale.consistency = consistency
+    sale.apiary = apiary
+    sale.category_id = category_id
+    sale.customer_id = customer_id
+    sale.customer_name = customer_name if not customer_id else None
+    db.session.commit()
+    flash('Sale updated.', 'success')
+    return redirect(url_for('sales.list_sales'))
+
+
+@sales_bp.route('/sales/<int:sale_id>/delete', methods=['POST'])
+def delete_sale(sale_id):
+    if not session.get('user'):
+        return redirect(url_for('main.home'))
+    sale = db.session.get(Sale, sale_id)
+    if sale is None:
+        abort(404)
+    if sale.invoice_id is not None:
+        flash('Sales created from an invoice cannot be deleted.', 'error')
+        return redirect(url_for('sales.list_sales'))
+    db.session.delete(sale)
+    db.session.commit()
+    flash('Sale deleted.', 'success')
     return redirect(url_for('sales.list_sales'))

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, current_app, jsonify
 from requests_oauthlib import OAuth2Session
 import os
-from .models import Admin, Season, Bookings, BookingsLamm
+from .models import Admin, Season, Bookings, BookingsLamm, Invoice, InvoiceLamm
 from . import db
 main = Blueprint('main', __name__)
 
@@ -60,6 +60,13 @@ def _season_stats(latest_season):
             new_count += 1
         else:
             returning_count += 1
+    # Invoiced and paid (andelsbiodling + lammandel)
+    num_invoiced_honey = len(latest_season.invoices)
+    num_invoiced_lamm = len(latest_season.invoices_lamm)
+    num_invoiced = num_invoiced_honey + num_invoiced_lamm
+    num_paid_honey = sum(1 for inv in latest_season.invoices if inv.date_payed is not None)
+    num_paid_lamm = sum(1 for inv in latest_season.invoices_lamm if inv.date_payed is not None)
+    num_paid = num_paid_honey + num_paid_lamm
     return {
         'num_bookings': num_bookings,
         'num_bookings_honey': num_bookings_honey,
@@ -69,6 +76,12 @@ def _season_stats(latest_season):
         'total_andelar_lamm': total_andelar_lamm,
         'new_customers': new_count,
         'returning_customers': returning_count,
+        'num_invoiced': num_invoiced,
+        'num_invoiced_honey': num_invoiced_honey,
+        'num_invoiced_lamm': num_invoiced_lamm,
+        'num_paid': num_paid,
+        'num_paid_honey': num_paid_honey,
+        'num_paid_lamm': num_paid_lamm,
     }
 
 
