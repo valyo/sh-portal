@@ -93,3 +93,102 @@ def booking(app, season, customer):
         db.session.commit()
         db.session.refresh(b)
         yield b
+
+
+@pytest.fixture
+def product(app):
+    """Create one product (solberg honung) for sales tests."""
+    from sh_portal.models import Product
+    from sh_portal import db
+    with app.app_context():
+        p = Product(name='solberg honung')
+        db.session.add(p)
+        db.session.commit()
+        db.session.refresh(p)
+        yield p
+
+
+@pytest.fixture
+def sale_category(app):
+    """Create one sale category (andel) for sales tests."""
+    from sh_portal.models import SaleCategory
+    from sh_portal import db
+    with app.app_context():
+        c = SaleCategory(name='andel')
+        db.session.add(c)
+        db.session.commit()
+        db.session.refresh(c)
+        yield c
+
+
+@pytest.fixture
+def sale(app, product, sale_category, customer):
+    """Create one sale (non-invoice) for edit/delete tests."""
+    from datetime import datetime
+    from sh_portal.models import Sale
+    from sh_portal import db
+    with app.app_context():
+        s = Sale(
+            timestamp=datetime(2025, 3, 1),
+            product_id=product.id,
+            skord='2025',
+            burk_kg=2.5,
+            unit_price=100.0,
+            quantity=2,
+            consistency='fast',
+            apiary='Solberg',
+            category_id=sale_category.id,
+            customer_id=customer.id,
+            customer_name=None,
+            invoice_id=None,
+        )
+        db.session.add(s)
+        db.session.commit()
+        db.session.refresh(s)
+        yield s
+
+
+@pytest.fixture
+def invoice(app, season, booking):
+    """Create one invoice (andelsbiodling) for payment tests."""
+    from sh_portal.models import Invoice
+    from sh_portal import db
+    with app.app_context():
+        inv = Invoice(
+            season_id=season.id,
+            booking_id=booking.id,
+            invoice_id='INV-TEST-001',
+            quantity=booking.quantity,
+            tot_sum=200.0,
+        )
+        db.session.add(inv)
+        db.session.commit()
+        db.session.refresh(inv)
+        yield inv
+
+
+@pytest.fixture
+def sale_from_invoice(app, product, sale_category, invoice, customer):
+    """Create one sale linked to an invoice (not editable/deletable via UI)."""
+    from datetime import datetime
+    from sh_portal.models import Sale
+    from sh_portal import db
+    with app.app_context():
+        s = Sale(
+            timestamp=datetime(2025, 3, 1),
+            product_id=product.id,
+            skord='2025',
+            burk_kg=2.5,
+            unit_price=100.0,
+            quantity=invoice.quantity,
+            consistency='fast',
+            apiary='Solberg',
+            category_id=sale_category.id,
+            customer_id=customer.id,
+            customer_name=None,
+            invoice_id=invoice.id,
+        )
+        db.session.add(s)
+        db.session.commit()
+        db.session.refresh(s)
+        yield s

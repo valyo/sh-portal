@@ -261,12 +261,12 @@ def edit_sale(sale_id):
     if errors:
         for msg in errors:
             flash(msg, 'error')
-        return redirect(url_for('sales.edit_sale', sale_id=sale_id))
+        return redirect(url_for('sales.list_sales', list=1))
     try:
         ts = datetime.strptime(date_str, '%Y-%m-%d')
     except (ValueError, TypeError):
         flash('Invalid date format.', 'error')
-        return redirect(url_for('sales.edit_sale', sale_id=sale_id))
+        return redirect(url_for('sales.list_sales', list=1))
 
     sale.timestamp = ts
     sale.product_id = product_id
