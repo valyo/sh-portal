@@ -101,6 +101,200 @@ def send_mail_using_current_config(app, msg):
     smtp.quit()
 
 
+CERTIFICATE_EMAIL_SUBJECT = "Tack för din betalning och varmt välkommen!"
+
+
+def _first_name_for_certificate_greeting(name):
+    """First whitespace-delimited token of the booking name for email salutation."""
+    if not name or not str(name).strip():
+        return "du"
+    return str(name).strip().split()[0]
+
+
+def _parse_season_year_int(year_value):
+    """Parse season.year string to int, or None if not a plain calendar year."""
+    if year_value is None:
+        return None
+    try:
+        return int(str(year_value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def honey_customer_has_prior_season_booking(booking, current_season):
+    """
+    True if this person has at least one honey (Bookings) row in a strictly earlier season
+    (by numeric season year). Lammandel is ignored.
+
+    Matching is by email (case-insensitive, trimmed), not only customer_id, so returning
+    customers are detected even if duplicate Customer rows exist for the same email.
+
+    If the current season year does not parse as an integer, returns False.
+    """
+    from sqlalchemy import func
+
+    from sh_portal import db
+    from sh_portal.models import Bookings, Customer, Season
+
+    cur_y = _parse_season_year_int(getattr(current_season, "year", None))
+    if cur_y is None:
+        return False
+
+    bid = getattr(booking, "id", None)
+    if bid is None:
+        return False
+    b = db.session.get(Bookings, bid)
+    if b is None:
+        return False
+
+    cid = b.customer_id
+    if cid is None:
+        return False
+
+    cust = db.session.get(Customer, cid)
+    if cust is None or not (cust.email or "").strip():
+        return False
+
+    email_norm = str(cust.email).strip().lower()
+
+    # All honey seasons this email has booked (any Customer row with same email)
+    years_rows = (
+        db.session.query(Season.year)
+        .join(Bookings, Bookings.season_id == Season.id)
+        .join(Customer, Customer.id == Bookings.customer_id)
+        .filter(
+            Customer.email.isnot(None),
+            func.lower(func.trim(Customer.email)) == email_norm,
+        )
+        .distinct()
+        .all()
+    )
+
+    for (year_str,) in years_rows:
+        py = _parse_season_year_int(year_str)
+        if py is not None and py < cur_y:
+            return True
+    return False
+
+
+def certificate_email_plain_text(season_year, first_name, honey_returning_customer=False):
+    y = str(season_year)
+    if honey_returning_customer:
+        welcome = f"Varmt välkommen återigen som andelsbiodlare {y}."
+    else:
+        welcome = f"Varmt välkommen som andelsbiodlare {y}."
+    return (
+        f"Hej {first_name},\n\n"
+        f"{welcome}\n\n"
+        f"Villkor {y}\n"
+        f"Villkor för andelsbiodlingen säsong {y} finns på vår hemsida http://solberghonung.se/\n\n"
+        f"Andelsbevis finns bifogat.\n\n"
+        f"Hälsningar,\n"
+        f"Valentin och Polina\n"
+    )
+
+
+def lamm_certificate_email_plain_text(season_year, first_name):
+    y = str(season_year)
+    return (
+        f"Hej {first_name},\n\n"
+        f"Varmt välkommen som lammandelsägare {y}.\n\n"
+        f"Vi hör av oss med mer information när det närmar sig hämtning av ditt lamm.\n\n"
+        f"Hälsningar,\n"
+        f"Valentin och Lasse\n"
+    )
+
+
+def certificate_download_filename(booking, season):
+    """Filename for certificate PDF attachment (matches previous download naming)."""
+    cert_name = booking.certificate_name if booking.certificate_name else booking.name
+    year_s = str(season.year)
+    suffix = year_s[-2:] if len(year_s) >= 2 else year_s
+    andelsnummer = f"{suffix}-{booking.id:03d}"
+    safe = (cert_name or "kund").replace(" ", "_")
+    return f"Andelsbevis_{andelsnummer}_{safe}.pdf"
+
+
+def build_certificate_template_context(booking, season):
+    return {
+        "booking": booking,
+        "season": season,
+        "current_date": datetime.now().strftime("%Y-%m-%d"),
+        "logo_cid": "logo",
+    }
+
+
+def write_certificate_pdf_to_disk(booking, season, is_lamm=False):
+    """
+    Render certificate PDF to the certificates/ folder.
+    Returns (success: bool, pdf_path: str).
+    """
+    template_path = os.path.join(current_app.root_path, "templates", "certificate_pdf_template.html")
+    internal_pdf = (
+        f"certificate_lamm_{booking.id}.pdf" if is_lamm else f"certificate_{booking.id}.pdf"
+    )
+    pdf_path = os.path.join(current_app.root_path, "..", "certificates", internal_pdf)
+    context = build_certificate_template_context(booking, season)
+    ok = generate_pdf_weasyprint(template_path, pdf_path, context, base_url=current_app.root_path)
+    return ok, pdf_path
+
+
+def send_booking_certificate_email(booking, season, is_lamm=False):
+    """
+    Email booking.email: honey andelsbiodling includes a PDF certificate; lammandel is text-only.
+    Returns (True, None) on success or (False, error_message) on failure.
+    """
+    from flask_mail import Message
+
+    first = _first_name_for_certificate_greeting(booking.name)
+    if is_lamm:
+        body = lamm_certificate_email_plain_text(season.year, first)
+    else:
+        returning = honey_customer_has_prior_season_booking(booking, season)
+        body = certificate_email_plain_text(
+            season.year, first, honey_returning_customer=returning
+        )
+
+    msg = Message(
+        CERTIFICATE_EMAIL_SUBJECT,
+        sender="noreply@example.com",
+        recipients=[booking.email],
+        body=body,
+    )
+
+    if not is_lamm:
+        ok, pdf_path = write_certificate_pdf_to_disk(booking, season, is_lamm=False)
+        if not ok:
+            return False, "Failed to generate certificate"
+        attachment_name = certificate_download_filename(booking, season)
+        try:
+            with open(pdf_path, "rb") as fp:
+                msg.attach(attachment_name, "application/pdf", fp.read())
+        except OSError as e:
+            current_app.logger.error("Certificate attach failed: %s", e)
+            return False, "Failed to read certificate file"
+
+    try:
+        effective, source = get_effective_mail_backend_with_source(current_app)
+        params = get_mail_connection_params(effective)
+        current_app.logger.info(
+            "Certificate mail: backend=%r (source=%s), %s:%s, to=%s",
+            effective,
+            source,
+            params["server"],
+            params["port"],
+            booking.email,
+        )
+        send_mail_using_current_config(current_app, msg)
+    except Exception as e:
+        current_app.logger.error(
+            "Certificate email send failed: %s\n%s", e, traceback.format_exc()
+        )
+        return False, str(e)
+
+    return True, None
+
+
 def format_exception_location(exc):
     """Return a string like 'andelsbiodling.py:274 in send_invoices' for the frame where the exception was raised."""
     if getattr(exc, '__traceback__', None) is None:

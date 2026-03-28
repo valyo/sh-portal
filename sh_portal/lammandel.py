@@ -5,8 +5,9 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    generate_pdf_weasyprint, format_exception_location, get_effective_mail_backend_with_source,
+    format_exception_location, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
+    write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
 from datetime import datetime, timedelta
 from flask_mail import Message
@@ -15,6 +16,7 @@ lammandel = Blueprint('lammandel', __name__)
 
 @lammandel.route('/lammandel/api/booking/<int:booking_id>/certificate', methods=['GET'])
 def generate_certificate(booking_id):
+    """Download certificate PDF (optional; primary flow is POST …/certificate/send)."""
     if not session.get('user'):
         return jsonify({'error': 'Unauthorized'}), 401
 
@@ -23,25 +25,30 @@ def generate_certificate(booking_id):
         abort(404)
     season = booking.season
 
-    # Prepare context for template
-    context = {
-        'booking': booking,
-        'season': season,
-        'current_date': datetime.now().strftime('%Y-%m-%d'),
-        'logo_cid': 'logo'
-    }
+    ok, pdf_path = write_certificate_pdf_to_disk(booking, season, is_lamm=True)
+    if ok:
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=certificate_download_filename(booking, season),
+        )
+    return jsonify({'error': 'Failed to generate certificate'}), 500
 
-    pdf_filename = f"certificate_lamm_{booking.id}.pdf"
-    pdf_path = os.path.join(current_app.root_path, '..', 'certificates', pdf_filename)
-    template_path = os.path.join(current_app.root_path, 'templates', 'certificate_pdf_template.html')
 
-    # Use WeasyPrint for certificates with direct Jinja2 rendering
-    if generate_pdf_weasyprint(template_path, pdf_path, context, base_url=current_app.root_path):
-        cert_name = booking.certificate_name if booking.certificate_name else booking.name
-        andelsnummer = f"{season.year[-2:]}-{booking.id:03d}"
-        return send_file(pdf_path, as_attachment=True, download_name=f"Andelsbevis_{andelsnummer}_{cert_name.replace(' ', '_')}.pdf")
-    else:
-        return jsonify({'error': 'Failed to generate certificate'}), 500
+@lammandel.route('/lammandel/api/booking/<int:booking_id>/certificate/send', methods=['POST'])
+def send_certificate(booking_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    booking = db.session.get(BookingsLamm, booking_id)
+    if booking is None:
+        abort(404)
+    season = booking.season
+
+    ok, err = send_booking_certificate_email(booking, season, is_lamm=True)
+    if ok:
+        return jsonify({'success': True, 'message': f'Email sent to {booking.email}.'})
+    return jsonify({'success': False, 'error': err or 'Failed to send certificate'}), 500
 
 @lammandel.route('/lammandel/import-bookings', methods=['POST'])
 def import_bookings():

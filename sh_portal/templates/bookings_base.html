@@ -279,8 +279,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-info me-auto" id="generateCertificateBtn">
-                        <i class="bi bi-patch-check"></i> Generate Certificate
+                    <button type="button" class="btn btn-info me-auto" id="sendCertificateBtn">
+                        <i class="bi bi-envelope-paper"></i> Send certificate
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('certificate_quantity').value = data.certificate_quantity || '';
 
                     // Store the payment status on the button itself
-                    const certBtn = document.getElementById('generateCertificateBtn');
+                    const certBtn = document.getElementById('sendCertificateBtn');
                     certBtn.dataset.isPaid = data.is_paid;
 
                     // Show the modal
@@ -604,24 +604,43 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Generate certificate button click handler
-    document.getElementById('generateCertificateBtn').addEventListener('click', function() {
+    // Send certificate by email (PDF attached)
+    document.getElementById('sendCertificateBtn').addEventListener('click', function() {
         const bookingId = document.getElementById('bookingId').value;
         if (!bookingId) return;
 
         const isPaid = this.dataset.isPaid === 'true';
         if (!isPaid) {
-            if (!confirm('Warning: This booking has not been marked as paid. Are you sure you want to generate the certificate anyway?')) {
+            if (!confirm('Warning: This booking has not been marked as paid. Are you sure you want to send the certificate by email anyway?')) {
                 return;
             }
         }
 
-        // Determine the API prefix based on the page title
         const pageTitle = document.querySelector('h1').textContent.trim();
         const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
 
-        // Trigger file download
-        window.location.href = `${apiPrefix}/api/booking/${bookingId}/certificate`;
+        const btn = this;
+        btn.disabled = true;
+        fetch(`${apiPrefix}/api/booking/${bookingId}/certificate/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        })
+        .then(response => response.json().then(data => ({ response, data })))
+        .then(({ response, data }) => {
+            if (response.ok && data.success) {
+                showNotification(data.message || 'Certificate sent.', false);
+            } else if (response.status === 401 || data.error === 'Unauthorized') {
+                showNotification('You are not logged in.', true);
+            } else {
+                showNotification('Error: ' + (data.error || 'Failed to send certificate'), true);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Error sending certificate', true);
+        })
+        .finally(() => { btn.disabled = false; });
     });
 });
 </script>
