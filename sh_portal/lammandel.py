@@ -47,6 +47,8 @@ def send_certificate(booking_id):
 
     ok, err = send_booking_certificate_email(booking, season, is_lamm=True)
     if ok:
+        booking.certificate_sent_at = datetime.utcnow()
+        db.session.commit()
         return jsonify({'success': True, 'message': f'Email sent to {booking.email}.'})
     return jsonify({'success': False, 'error': err or 'Failed to send certificate'}), 500
 
@@ -149,6 +151,7 @@ def get_booking(booking_id):
         'quantity': booking.quantity,
         'certificate_name': booking.certificate_name,
         'certificate_quantity': booking.certificate_quantity,
+        'certificate_sent_at': booking.certificate_sent_at.isoformat() if booking.certificate_sent_at else None,
         'is_paid': is_paid
     })
 
@@ -173,6 +176,13 @@ def update_booking(booking_id):
         booking.certificate_name = request.form.get('certificate_name')
         cert_qty = request.form.get('certificate_quantity')
         booking.certificate_quantity = int(cert_qty) if cert_qty else None
+
+        cert_mark = request.form.get('certificate_sent')
+        if cert_mark == '1':
+            if booking.certificate_sent_at is None:
+                booking.certificate_sent_at = datetime.utcnow()
+        elif cert_mark == '0':
+            booking.certificate_sent_at = None
 
         db.session.commit()
         flash('Booking updated successfully', 'success')
