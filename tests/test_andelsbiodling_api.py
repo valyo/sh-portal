@@ -22,6 +22,7 @@ class TestGetBooking:
         assert data["email"] == booking.email
         assert data["quantity"] == booking.quantity
         assert "is_paid" in data
+        assert "certificate_sent_at" in data
 
 
 class TestUpdateBooking:
@@ -69,6 +70,39 @@ class TestUpdateBooking:
             b = db.session.get(Bookings, booking.id)
             assert b.name == "Updated Name"
             assert b.quantity == 5
+
+    def test_update_booking_certificate_sent_checkbox(self, logged_in_client, booking, app):
+        """certificate_sent=1 sets timestamp when was unset; certificate_sent=0 clears."""
+        base = {
+            "name": booking.name,
+            "email": booking.email,
+            "telephone": booking.telephone,
+            "address": booking.address,
+            "postnummer": booking.postnummer,
+            "ort": booking.ort,
+            "message": "",
+            "quantity": str(booking.quantity),
+            "certificate_name": "",
+            "certificate_quantity": "",
+        }
+        rv = logged_in_client.post(
+            f"/api/booking/{booking.id}",
+            data={**base, "certificate_sent": "1"},
+        )
+        assert rv.status_code == 200
+        with app.app_context():
+            from sh_portal.models import Bookings
+            from sh_portal import db
+            b = db.session.get(Bookings, booking.id)
+            assert b.certificate_sent_at is not None
+        rv2 = logged_in_client.post(
+            f"/api/booking/{booking.id}",
+            data={**base, "certificate_sent": "0"},
+        )
+        assert rv2.status_code == 200
+        with app.app_context():
+            b = db.session.get(Bookings, booking.id)
+            assert b.certificate_sent_at is None
 
 
 class TestSendInvoices:
