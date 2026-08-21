@@ -78,6 +78,46 @@
                     </div>
                 </div>
                 <!-- End Import Modal -->
+                {% if page_title == 'Andelsbiodling' %}
+                <div class="row mb-3">
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Honey delivered</div>
+                                <div class="fw-bold">
+                                    {% if honey_delivered_kg is not none %}{{ "%.1f"|format(honey_delivered_kg) }} kg{% else %}unknown{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Price per kg realised</div>
+                                <div class="fw-bold">
+                                    {% if price_per_kg_realised is not none %}{{ "%.2f"|format(price_per_kg_realised) }} kr/kg{% else %}unknown{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Total invoiced</div>
+                                <div class="fw-bold">{{ "{:,.2f}".format(total_invoiced)|replace(",", " ") }} kr</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Total paid</div>
+                                <div class="fw-bold">{{ "{:,.2f}".format(total_paid)|replace(",", " ") }} kr</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <!-- Tabs -->
                 <ul class="nav nav-tabs mt-4" id="myTab" role="tablist">
                     <li class="nav-item" role="presentation">

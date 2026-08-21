@@ -1,6 +1,79 @@
 """Tests for Andelsbiodling API endpoints."""
 
 
+class TestIndexHoneyStats:
+    """GET /andelsbiodling - honey delivered / price per kg realised stats."""
+
+    def test_shows_unknown_when_kg_honey_missing(self, logged_in_client, season, booking):
+        rv = logged_in_client.get(f"/andelsbiodling?season_id={season.id}")
+        assert rv.status_code == 200
+        html = rv.get_data(as_text=True)
+        assert "Honey delivered" in html
+        assert "Price per kg realised" in html
+        assert html.count("unknown") >= 2
+
+    def test_computes_stats_from_paid_bookings_only(self, logged_in_client, season, customer, app):
+        with app.app_context():
+            from datetime import datetime
+            from sh_portal.models import Season, Bookings, Invoice
+            from sh_portal import db
+            s = db.session.get(Season, season.id)
+            s.kg_honey = 200.0
+            s.price = 100.0
+            db.session.commit()
+
+            # Paid booking: counts towards honey delivered / price realised
+            paid_booking = Bookings(season_id=season.id, customer_id=customer.id, quantity=2)
+            # Unpaid booking: must NOT count towards either metric
+            unpaid_booking = Bookings(season_id=season.id, customer_id=customer.id, quantity=5)
+            db.session.add_all([paid_booking, unpaid_booking])
+            db.session.commit()
+
+            db.session.add(Invoice(season_id=season.id, booking_id=paid_booking.id, invoice_id="INV-PAID",
+                                    quantity=paid_booking.quantity, tot_sum=200.0, date_payed=datetime.utcnow()))
+            db.session.add(Invoice(season_id=season.id, booking_id=unpaid_booking.id, invoice_id="INV-UNPAID",
+                                    quantity=unpaid_booking.quantity, tot_sum=500.0))
+            db.session.commit()
+
+        rv = logged_in_client.get(f"/andelsbiodling?season_id={season.id}")
+        assert rv.status_code == 200
+        html = rv.get_data(as_text=True)
+        # kg_honey is kg per andel; only the paid booking's 2 andelar count: 200 * 2 = 400 kg
+        assert "400.0 kg" in html
+        # realised price per kg = total paid (200 kr) / honey delivered (400 kg) = 0.5 kr/kg
+        assert "0.50 kr/kg" in html
+
+    def test_zero_totals_with_no_invoices(self, logged_in_client, season, booking):
+        rv = logged_in_client.get(f"/andelsbiodling?season_id={season.id}")
+        assert rv.status_code == 200
+        html = rv.get_data(as_text=True)
+        assert "Total invoiced" in html
+        assert "Total paid" in html
+        assert "0.00 kr" in html
+
+    def test_totals_invoiced_and_paid(self, logged_in_client, season, customer, app):
+        with app.app_context():
+            from datetime import datetime
+            from sh_portal.models import Bookings, Invoice
+            from sh_portal import db
+            b1 = Bookings(season_id=season.id, customer_id=customer.id, quantity=2)
+            b2 = Bookings(season_id=season.id, customer_id=customer.id, quantity=3)
+            db.session.add_all([b1, b2])
+            db.session.commit()
+            inv_paid = Invoice(season_id=season.id, booking_id=b1.id, invoice_id="INV-PAID",
+                                quantity=b1.quantity, tot_sum=200.0, date_payed=datetime.utcnow())
+            inv_unpaid = Invoice(season_id=season.id, booking_id=b2.id, invoice_id="INV-UNPAID",
+                                  quantity=b2.quantity, tot_sum=300.0)
+            db.session.add_all([inv_paid, inv_unpaid])
+            db.session.commit()
+
+        rv = logged_in_client.get(f"/andelsbiodling?season_id={season.id}")
+        assert rv.status_code == 200
+        html = rv.get_data(as_text=True)
+        assert "500.00 kr" in html  # total invoiced: 200 + 300
+        assert "200.00 kr" in html  # total paid: only the paid invoice
+
+
 class TestGetBooking:
     """GET /api/booking/<id> (andelsbiodling context)."""
 
