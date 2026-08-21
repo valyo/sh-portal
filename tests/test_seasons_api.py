@@ -66,6 +66,37 @@ class TestUpdateSeason:
             assert s.price == 150.0
             assert s.price_lamm == 250.0
 
+    def test_kg_honey_set_and_cleared(self, logged_in_client, season, app):
+        rv = logged_in_client.post(
+            f"/api/season/{season.id}",
+            data={
+                "year": "2025",
+                "price": "150.0",
+                "price_lamm": "250.0",
+                "kg_honey": "123.5",
+            },
+        )
+        assert rv.status_code == 200
+        with app.app_context():
+            from sh_portal.models import Season
+            from sh_portal import db
+            s = db.session.get(Season, season.id)
+            assert s.kg_honey == 123.5
+
+        rv2 = logged_in_client.post(
+            f"/api/season/{season.id}",
+            data={
+                "year": "2025",
+                "price": "150.0",
+                "price_lamm": "250.0",
+                "kg_honey": "",
+            },
+        )
+        assert rv2.status_code == 200
+        with app.app_context():
+            s = db.session.get(Season, season.id)
+            assert s.kg_honey is None
+
 
 class TestDeleteSeason:
     """POST /api/season/<id>/delete"""

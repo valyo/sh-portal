@@ -20,6 +20,7 @@
                                 <tr>
                                     <th>Year</th>
                                     <th>Price Honey</th>
+                                    <th>Kg Honey</th>
                                     <th>Price Lamb</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -30,6 +31,7 @@
                                 <tr>
                                     <td>{{ season.year }}</td>
                                     <td>{{ season.price | int }}</td>
+                                    <td>{{ season.kg_honey if season.kg_honey is not none else '-' }}</td>
                                     <td>{{ season.price_lamm | int }}</td>
                                     <td>
                                         <span class="badge bg-success">Active</span>
@@ -76,6 +78,10 @@
                                 <div class="mb-3">
                                     <label for="price" class="form-label">Price</label>
                                     <input type="number" step="1" class="form-control" id="price" name="price" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="kg_honey" class="form-label">Kg Honey</label>
+                                    <input type="number" step="0.1" class="form-control" id="kg_honey" name="kg_honey">
                                 </div>
                                 <div class="mb-3">
                                     <label for="google_sheets_link_honey" class="form-label">Google Sheets Link</label>
@@ -137,6 +143,10 @@
                                 <div class="mb-3">
                                     <label for="manage_price" class="form-label">Price</label>
                                     <input type="number" step="1" class="form-control" id="manage_price" name="price" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="manage_kg_honey" class="form-label">Kg Honey</label>
+                                    <input type="number" step="0.1" class="form-control" id="manage_kg_honey" name="kg_honey">
                                 </div>
                                 <div class="mb-3">
                                     <label for="manage_google_sheets_link_honey" class="form-label">Google Sheets Link</label>
@@ -245,6 +255,7 @@
                         document.getElementById('seasonId').value = data.id;
                         document.getElementById('manage_year').value = data.year;
                         document.getElementById('manage_price').value = data.price;
+                        document.getElementById('manage_kg_honey').value = data.kg_honey !== null ? data.kg_honey : '';
                         document.getElementById('manage_price_lamm').value = data.price_lamm;
                         document.getElementById('manage_google_sheets_link_honey').value = data.google_sheets_link_honey || '';
                         document.getElementById('manage_sheet_range_honey').value = data.sheet_range_honey || 'Form Responses 1';
