@@ -54,6 +54,7 @@ class Bookings(db.Model):
     certificate_name = db.Column(db.String(150), nullable=True)
     certificate_quantity = db.Column(db.Integer, nullable=True)
     certificate_sent_at = db.Column(db.DateTime, nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
 
     season = db.relationship('Season', backref=db.backref('bookings', lazy=True))
     customer = db.relationship('Customer', backref=db.backref('bookings', lazy=True))
@@ -98,6 +99,7 @@ class BookingsLamm(db.Model):
     certificate_name = db.Column(db.String(150), nullable=True)
     certificate_quantity = db.Column(db.Integer, nullable=True)
     certificate_sent_at = db.Column(db.DateTime, nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
 
     season = db.relationship('Season', backref=db.backref('bookings_lamm', lazy=True))
     customer = db.relationship('Customer', backref=db.backref('bookings_lamm', lazy=True))

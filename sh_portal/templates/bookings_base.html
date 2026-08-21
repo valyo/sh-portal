@@ -112,6 +112,7 @@
                                                 <th>Status</th>
                                                 <th>Payment</th>
                                                 <th>{% if page_title == 'Lammandel' %}Welcome sent{% else %}Cert. sent{% endif %}</th>
+                                                <th>Delivered</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
@@ -147,6 +148,13 @@
                                                 <td>
                                                     {% if booking.certificate_sent_at %}
                                                         <span class="badge bg-info text-dark" title="{{ booking.certificate_sent_at.strftime('%Y-%m-%d %H:%M') }}">Yes</span>
+                                                    {% else %}
+                                                        <span class="badge bg-light text-muted border">No</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if booking.delivered_at %}
+                                                        <span class="badge bg-success" title="{{ booking.delivered_at.strftime('%Y-%m-%d %H:%M') }}">Yes</span>
                                                     {% else %}
                                                         <span class="badge bg-light text-muted border">No</span>
                                                     {% endif %}
@@ -296,6 +304,15 @@
                             {% else %}
                             Check to record that the customer has received the certificate or welcome email; uncheck to clear. Sending from this form also sets this automatically.
                             {% endif %}
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="delivered" name="delivered" value="1">
+                        <label class="form-check-label" for="delivered">
+                            Delivered
+                        </label>
+                        <div class="form-text">
+                            Check to record that this booking has been delivered; uncheck to clear.
                         </div>
                     </div>
                 </div>
@@ -536,6 +553,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('certificate_name').value = data.certificate_name || '';
                     document.getElementById('certificate_quantity').value = data.certificate_quantity || '';
                     document.getElementById('certificate_sent').checked = !!data.certificate_sent_at;
+                    document.getElementById('delivered').checked = !!data.delivered_at;
 
                     // Store the payment status on the button itself
                     const certBtn = document.getElementById('sendCertificateBtn');
@@ -557,6 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(this);
         const bookingId = formData.get('booking_id');
         formData.set('certificate_sent', document.getElementById('certificate_sent').checked ? '1' : '0');
+        formData.set('delivered', document.getElementById('delivered').checked ? '1' : '0');
 
         // Determine the API prefix based on the page title
         const pageTitle = document.querySelector('h1').textContent.trim();

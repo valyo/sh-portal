@@ -104,6 +104,39 @@ class TestUpdateBooking:
             b = db.session.get(Bookings, booking.id)
             assert b.certificate_sent_at is None
 
+    def test_update_booking_delivered_checkbox(self, logged_in_client, booking, app):
+        """delivered=1 sets timestamp when was unset; delivered=0 clears."""
+        base = {
+            "name": booking.name,
+            "email": booking.email,
+            "telephone": booking.telephone,
+            "address": booking.address,
+            "postnummer": booking.postnummer,
+            "ort": booking.ort,
+            "message": "",
+            "quantity": str(booking.quantity),
+            "certificate_name": "",
+            "certificate_quantity": "",
+        }
+        rv = logged_in_client.post(
+            f"/api/booking/{booking.id}",
+            data={**base, "delivered": "1"},
+        )
+        assert rv.status_code == 200
+        with app.app_context():
+            from sh_portal.models import Bookings
+            from sh_portal import db
+            b = db.session.get(Bookings, booking.id)
+            assert b.delivered_at is not None
+        rv2 = logged_in_client.post(
+            f"/api/booking/{booking.id}",
+            data={**base, "delivered": "0"},
+        )
+        assert rv2.status_code == 200
+        with app.app_context():
+            b = db.session.get(Bookings, booking.id)
+            assert b.delivered_at is None
+
 
 class TestSendInvoices:
     """POST /api/send-invoices."""

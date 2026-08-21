@@ -153,6 +153,7 @@ def get_booking(booking_id):
         'certificate_name': booking.certificate_name,
         'certificate_quantity': booking.certificate_quantity,
         'certificate_sent_at': booking.certificate_sent_at.isoformat() if booking.certificate_sent_at else None,
+        'delivered_at': booking.delivered_at.isoformat() if booking.delivered_at else None,
         'is_paid': is_paid
     })
 
@@ -184,6 +185,13 @@ def update_booking(booking_id):
                 booking.certificate_sent_at = datetime.utcnow()
         elif cert_mark == '0':
             booking.certificate_sent_at = None
+
+        delivered_mark = request.form.get('delivered')
+        if delivered_mark == '1':
+            if booking.delivered_at is None:
+                booking.delivered_at = datetime.utcnow()
+        elif delivered_mark == '0':
+            booking.delivered_at = None
 
         db.session.commit()
         flash('Booking updated successfully', 'success')
