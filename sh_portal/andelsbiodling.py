@@ -112,10 +112,26 @@ def index():
     # Fetch bookings and invoices for the selected season
     bookings = []
     invoices = {}
+    honey_delivered_kg = None
+    price_per_kg_realised = None
+    total_invoiced = 0.0
+    total_paid = 0.0
     if selected_season:
         bookings = Bookings.query.filter_by(season_id=selected_season.id).all()
         # Create a dictionary of invoices by booking_id
         invoices = {invoice.booking_id: invoice for invoice in Invoice.query.filter_by(season_id=selected_season.id).all()}
+
+        total_invoiced = sum(inv.tot_sum for inv in invoices.values())
+        total_paid = sum(inv.tot_sum for inv in invoices.values() if inv.date_payed is not None)
+
+        paid_andelar = sum(
+            b.quantity for b in bookings
+            if b.id in invoices and invoices[b.id].date_payed is not None
+        )
+        if selected_season.kg_honey is not None:
+            honey_delivered_kg = selected_season.kg_honey * paid_andelar
+        if honey_delivered_kg:
+            price_per_kg_realised = total_paid / honey_delivered_kg
 
     return render_template(
         'bookings_base.html',
@@ -125,7 +141,11 @@ def index():
         bookings=bookings,
         invoices=invoices,  # Pass invoices as a dictionary
         page_title="Andelsbiodling",
-        import_url=url_for('andelsbiodling.import_bookings')
+        import_url=url_for('andelsbiodling.import_bookings'),
+        honey_delivered_kg=honey_delivered_kg,
+        price_per_kg_realised=price_per_kg_realised,
+        total_invoiced=total_invoiced,
+        total_paid=total_paid
     )
 
 @andelsbiodling.route('/api/booking/<int:booking_id>', methods=['GET'])
