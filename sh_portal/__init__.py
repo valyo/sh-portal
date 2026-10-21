@@ -47,6 +47,9 @@ def create_app():
     app.config['GITHUB_API_URL'] = GITHUB_API_URL
     app.config['OAUTH_REDIRECT_URI'] = os.getenv('OAUTH_REDIRECT_URI', 'http://localhost:8087/callback')
     app.config['GOOGLE_SHEET_ID'] = os.getenv('GOOGLE_SHEET_ID')
+    # Urlencoded forms are no longer capped by Werkzeug's max_form_memory_size
+    # (3.1.9+); cap the whole request body instead.
+    app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 
     # Mail configuration: MAIL_BACKEND=mailcatcher (default) or google
     mail_backend = os.getenv('MAIL_BACKEND', 'mailcatcher').lower()
