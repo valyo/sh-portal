@@ -68,14 +68,14 @@ class TestInvoiceVat:
             inv = self._invoice(app, model_name, booking)
             assert inv.vat_rate == rate
             assert inv.tot_sum == total  # prices are VAT-inclusive: total is unchanged
-            assert inv.vat_net == pytest.approx(total / (1 + rate / 100))
-            assert inv.vat_amount == pytest.approx(total - total / (1 + rate / 100))
+            assert inv.vat_net == round(total / (1 + rate / 100), 2)
+            assert inv.vat_net + inv.vat_amount == pytest.approx(total, abs=1e-9)
             other = 6 if rate == 12 else 12
             for html in (_render_pdf_html(app, inv), _render_email_html(app, inv)):
                 assert f"{rate}%" in html
                 assert f"{other}%" not in html
                 assert f"{inv.vat_amount:.2f} kr" in html
-                assert f"{inv.vat_net:.3f} kr" in html
+                assert f"{inv.vat_net:.2f} kr" in html
 
     def test_pdf_is_saved_under_configured_invoices_dir(self, request, logged_in_client, season, app, monkeypatch,
                                                          fake_invoice_pdf, url, module, model_name,
@@ -129,3 +129,47 @@ class TestInvoiceVat:
         with app.app_context():
             from sh_portal import models
             assert getattr(models, model_name).query.filter_by(booking_id=booking.id).count() == 0
+
+
+class TestVatRounding:
+    """Net + VAT must add up to the total exactly as printed (to the öre)."""
+
+    @pytest.mark.parametrize("rate", [6, 12])
+    @pytest.mark.parametrize("total", [100.0, 250.0, 333.33, 1350.0, 4200.0, 0.01, 19999.99])
+    def test_net_plus_vat_equals_total(self, rate, total):
+        from sh_portal.models import Invoice
+        inv = Invoice(tot_sum=total, vat_rate=rate)
+        assert round(inv.vat_net + inv.vat_amount, 2) == total
+        assert inv.vat_net == round(inv.vat_net, 2)
+        assert inv.vat_amount == round(inv.vat_amount, 2)
+
+    def test_example_that_used_to_be_off_by_an_ore(self):
+        from sh_portal.models import Invoice
+        inv = Invoice(tot_sum=250.0, vat_rate=6)
+        assert (inv.vat_net, inv.vat_amount) == (235.85, 14.15)
+
+
+class TestVatRateIsAlwaysExplicit:
+    def test_invoice_without_vat_rate_is_rejected_by_the_database(self, app, season, booking):
+        import sqlalchemy
+        from sh_portal import db
+        from sh_portal.models import Invoice
+        with app.app_context():
+            db.session.add(Invoice(season_id=season.id, booking_id=booking.id, invoice_id="NO-VAT", quantity=1, tot_sum=1.0))
+            with pytest.raises(sqlalchemy.exc.IntegrityError):
+                db.session.commit()
+            db.session.rollback()
+
+    @pytest.mark.parametrize("payload,expected", [
+        ({"vat_rate": 6}, 6), ({"vat_rate": "12"}, 12), ({"vat_rate": 12.0}, 12),
+    ])
+    def test_parse_vat_rate_accepts_the_allowed_rates(self, payload, expected):
+        from sh_portal.utils import parse_vat_rate
+        assert parse_vat_rate(payload) == (expected, None)
+
+    @pytest.mark.parametrize("payload", [{}, None, {"vat_rate": None}, {"vat_rate": ""}, {"vat_rate": "x"}, {"vat_rate": 25}, {"vat_rate": 0}])
+    def test_parse_vat_rate_rejects_everything_else(self, payload):
+        from sh_portal.utils import parse_vat_rate
+        rate, error = parse_vat_rate(payload)
+        assert rate is None and "select a VAT rate" in error
+

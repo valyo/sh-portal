@@ -30,9 +30,9 @@ class TestIndexHoneyStats:
             db.session.commit()
 
             db.session.add(Invoice(season_id=season.id, booking_id=paid_booking.id, invoice_id="INV-PAID",
-                                    quantity=paid_booking.quantity, tot_sum=200.0, date_payed=datetime.utcnow()))
+                                    quantity=paid_booking.quantity, tot_sum=200.0, vat_rate=12, date_payed=datetime.utcnow()))
             db.session.add(Invoice(season_id=season.id, booking_id=unpaid_booking.id, invoice_id="INV-UNPAID",
-                                    quantity=unpaid_booking.quantity, tot_sum=500.0))
+                                    quantity=unpaid_booking.quantity, tot_sum=500.0, vat_rate=12))
             db.session.commit()
 
         rv = logged_in_client.get(f"/andelsbiodling?season_id={season.id}")
@@ -61,9 +61,9 @@ class TestIndexHoneyStats:
             db.session.add_all([b1, b2])
             db.session.commit()
             inv_paid = Invoice(season_id=season.id, booking_id=b1.id, invoice_id="INV-PAID",
-                                quantity=b1.quantity, tot_sum=200.0, date_payed=datetime.utcnow())
+                                quantity=b1.quantity, tot_sum=200.0, vat_rate=12, date_payed=datetime.utcnow())
             inv_unpaid = Invoice(season_id=season.id, booking_id=b2.id, invoice_id="INV-UNPAID",
-                                  quantity=b2.quantity, tot_sum=300.0)
+                                  quantity=b2.quantity, tot_sum=300.0, vat_rate=12)
             db.session.add_all([inv_paid, inv_unpaid])
             db.session.commit()
 

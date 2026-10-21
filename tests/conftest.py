@@ -161,6 +161,7 @@ def invoice(app, season, booking):
             invoice_id='INV-TEST-001',
             quantity=booking.quantity,
             tot_sum=200.0,
+            vat_rate=12,
         )
         db.session.add(inv)
         db.session.commit()
@@ -227,7 +228,7 @@ def lamm_invoice(app, season, customer):
         db.session.add(b)
         db.session.commit()
         inv = InvoiceLamm(season_id=season.id, booking_id=b.id, invoice_id="F-LAMM-2025-0001",
-                          quantity=2, tot_sum=400.0)
+                          quantity=2, tot_sum=400.0, vat_rate=12)
         db.session.add(inv)
         db.session.commit()
         db.session.refresh(inv)

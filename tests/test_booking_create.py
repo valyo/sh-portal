@@ -90,7 +90,8 @@ class TestCreateBooking:
             assert self._model(model_name).query.count() == 0
 
     @pytest.mark.parametrize("override", [
-        {"quantity": "0"}, {"quantity": "abc"}, {"quantity": ""},
+        {"quantity": "0"}, {"quantity": "abc"}, {"quantity": ""}, {"quantity": "201"}, {"quantity": "1000000000"},
+        {"certificate_quantity": "201"},
         {"certificate_quantity": "0"}, {"certificate_quantity": "x"},
         {"booking_date": "yesterday"}, {"season_id": "99999"}, {"season_id": ""},
     ])
@@ -129,3 +130,155 @@ class TestCreateLammandelPrices:
             from sh_portal import db
             from sh_portal.models import BookingsLamm
             assert db.session.get(BookingsLamm, rv.get_json()["booking_id"]).get_andel_tiers() == [1, 1]
+
+
+@pytest.mark.parametrize("url,model_name", APPS)
+class TestCreateBookingLimitsAndCustomers:
+    def _model(self, name):
+        from sh_portal import models
+        return getattr(models, name)
+
+    def test_maximum_quantity_is_accepted(self, logged_in_client, season, url, model_name):
+        assert logged_in_client.post(url, data=_form(season, quantity="200")).status_code == 200
+
+    def test_email_match_ignores_case_and_blocks_duplicates(self, logged_in_client, season, app, url, model_name):
+        assert logged_in_client.post(url, data=_form(season, email="nina@example.com")).status_code == 200
+        rv = logged_in_client.post(url, data=_form(season, email="Nina@Example.COM"))
+        assert rv.status_code == 400
+        assert "already exists" in rv.get_json()["message"]
+        with app.app_context():
+            from sh_portal.models import Customer
+            assert Customer.query.count() == 1
+
+    def test_duplicate_check_covers_every_customer_row_with_that_email(self, logged_in_client, season, app, url, model_name):
+        from sh_portal import db
+        from sh_portal.models import Customer
+        with app.app_context():
+            first = Customer(email="dup@example.com", name="A", telephone="1", address="a", postnummer="1", ort="x")
+            second = Customer(email="dup@example.com", name="B", telephone="2", address="b", postnummer="2", ort="y")
+            db.session.add_all([first, second])
+            db.session.commit()
+            db.session.add(self._model(model_name)(season_id=season.id, customer_id=second.id, quantity=1))
+            db.session.commit()
+        rv = logged_in_client.post(url, data=_form(season, email="dup@example.com"))
+        assert rv.status_code == 400
+
+    def test_notes_say_when_an_existing_customers_details_changed(self, logged_in_client, season, customer, url, model_name):
+        rv = logged_in_client.post(url, data=_form(season, email=customer.email, telephone="0999999999"))
+        assert rv.status_code == 200
+        notes = rv.get_json()["notes"]
+        assert len(notes) == 1
+        assert "telephone" in notes[0] and customer.email in notes[0]
+
+    def test_no_note_when_existing_customers_details_are_unchanged(self, logged_in_client, season, customer, url, model_name):
+        rv = logged_in_client.post(url, data=_form(
+            season, email=customer.email, name=customer.name, telephone=customer.telephone,
+            address=customer.address, postnummer=customer.postnummer, ort=customer.ort))
+        assert rv.status_code == 200
+        assert rv.get_json()["notes"] == []
+
+    def test_sent_and_delivered_are_stored_as_utc_like_the_edit_form(self, logged_in_client, season, app, url, model_name):
+        from datetime import datetime, timedelta
+        from sh_portal import db
+        rv = logged_in_client.post(url, data=_form(season))
+        with app.app_context():
+            b = db.session.get(self._model(model_name), rv.get_json()["booking_id"])
+            for stamp in (b.certificate_sent_at, b.delivered_at):
+                assert abs(datetime.utcnow() - stamp) < timedelta(seconds=30)
+
+
+@pytest.mark.parametrize("update_url_prefix,model_name", [("/api/booking", "Bookings"), ("/lammandel/api/booking", "BookingsLamm")])
+class TestUpdateQuantityLimit:
+    def test_update_rejects_absurd_quantity(self, logged_in_client, season, customer, app, update_url_prefix, model_name):
+        from sh_portal import db, models
+        with app.app_context():
+            b = getattr(models, model_name)(season_id=season.id, customer_id=customer.id, quantity=2)
+            db.session.add(b)
+            db.session.commit()
+            booking_id = b.id
+        form = {
+            "name": customer.name, "email": customer.email, "telephone": customer.telephone,
+            "address": customer.address, "postnummer": customer.postnummer, "ort": customer.ort,
+            "message": "", "certificate_name": "", "certificate_quantity": "", "quantity": "1000000000",
+        }
+        rv = logged_in_client.post(f"{update_url_prefix}/{booking_id}", data=form)
+        assert rv.get_json()["success"] is False
+        assert "between 1 and 200" in rv.get_json()["message"]
+        with app.app_context():
+            assert db.session.get(getattr(models, model_name), booking_id).quantity == 2
+
+
+class TestSheetImportQuantityLimit:
+    def test_oversized_quantity_row_is_skipped(self, app, season):
+        from sh_portal import db
+        from sh_portal.models import Bookings
+        from sh_portal.utils import import_bookings_from_sheet
+        rows = [
+            ["10/01/2025 10:00:00", "ok@example.com", "Ok Person", "1", "a", "1", "x", "", "3"],
+            ["10/01/2025 10:05:00", "typo@example.com", "Typo Person", "1", "a", "1", "x", "", "1000000"],
+        ]
+        with app.test_request_context():
+            import_bookings_from_sheet(db, Bookings, season.id, rows)
+        with app.app_context():
+            emails = sorted(b.email for b in Bookings.query.all())
+            assert emails == ["ok@example.com"]
+
+
+@pytest.mark.parametrize("update_url_prefix,model_name", [("/api/booking", "Bookings"), ("/lammandel/api/booking", "BookingsLamm")])
+class TestUpdateCertificateQuantityLimit:
+    def _booking(self, app, season, customer, model_name):
+        from sh_portal import db, models
+        with app.app_context():
+            b = getattr(models, model_name)(season_id=season.id, customer_id=customer.id, quantity=2, certificate_quantity=3)
+            db.session.add(b)
+            db.session.commit()
+            return b.id
+
+    def _form(self, customer, certificate_quantity):
+        return {
+            "name": customer.name, "email": customer.email, "telephone": customer.telephone,
+            "address": customer.address, "postnummer": customer.postnummer, "ort": customer.ort,
+            "message": "", "certificate_name": "", "quantity": "2", "certificate_quantity": certificate_quantity,
+        }
+
+    @pytest.mark.parametrize("bad", ["0", "-1", "201", "1000000000", "abc", "2.5"])
+    def test_invalid_certificate_quantity_is_rejected_and_nothing_changes(
+            self, logged_in_client, season, customer, app, update_url_prefix, model_name, bad):
+        from sh_portal import db, models
+        booking_id = self._booking(app, season, customer, model_name)
+        rv = logged_in_client.post(f"{update_url_prefix}/{booking_id}", data=self._form(customer, bad))
+        assert rv.get_json()["success"] is False
+        assert "Certificate quantity" in rv.get_json()["message"]
+        with app.app_context():
+            assert db.session.get(getattr(models, model_name), booking_id).certificate_quantity == 3
+
+    @pytest.mark.parametrize("raw,expected", [("1", 1), ("200", 200), ("", None)])
+    def test_valid_certificate_quantity_and_empty_means_automatic(
+            self, logged_in_client, season, customer, app, update_url_prefix, model_name, raw, expected):
+        from sh_portal import db, models
+        booking_id = self._booking(app, season, customer, model_name)
+        rv = logged_in_client.post(f"{update_url_prefix}/{booking_id}", data=self._form(customer, raw))
+        assert rv.get_json()["success"] is True
+        with app.app_context():
+            assert db.session.get(getattr(models, model_name), booking_id).certificate_quantity == expected
+
+
+class TestSheetImportDuplicateEmails:
+    def test_import_does_not_double_book_when_a_second_customer_row_has_the_same_email(self, app, season):
+        from sh_portal import db
+        from sh_portal.models import Bookings, Customer
+        from sh_portal.utils import import_bookings_from_sheet
+        with app.app_context():
+            older = Customer(email="dup@example.com", name="A", telephone="1", address="a", postnummer="1", ort="x")
+            newer = Customer(email="dup@example.com", name="B", telephone="2", address="b", postnummer="2", ort="y")
+            db.session.add_all([older, newer])
+            db.session.commit()
+            # the existing booking sits on the *newer* row; the import resolves the older one
+            db.session.add(Bookings(season_id=season.id, customer_id=newer.id, quantity=1))
+            db.session.commit()
+        rows = [["10/01/2025 10:00:00", "Dup@Example.com", "A", "1", "a", "1", "x", "", "2"]]
+        with app.test_request_context():
+            import_bookings_from_sheet(db, Bookings, season.id, rows)
+        with app.app_context():
+            assert Bookings.query.count() == 1
+

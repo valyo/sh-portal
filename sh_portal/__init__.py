@@ -1,5 +1,6 @@
 import os
-from flask import Flask
+from urllib.parse import urlparse
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
@@ -50,6 +51,13 @@ def create_app():
     # Urlencoded forms are no longer capped by Werkzeug's max_form_memory_size
     # (3.1.9+); cap the whole request body instead.
     app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
+
+    # The login cookie is not sent on cross-site POSTs (CSRF); see reject_cross_origin_writes below.
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    # Hosts allowed as the Origin of state-changing requests, besides the Host the request came in on.
+    app.config['ALLOWED_ORIGIN_HOSTS'] = {
+        h.strip() for h in (os.getenv('ALLOWED_ORIGIN_HOSTS') or '').split(',') if h.strip()
+    }
 
     # Where generated invoice PDFs are stored: <INVOICES_DIR>/<andelsbiodling|lammandel>/<season year>/
     app.config['INVOICES_DIR'] = os.path.abspath(
@@ -104,6 +112,29 @@ def create_app():
     from sh_portal.andelsbiodling import andelsbiodling
     from sh_portal.lammandel import lammandel
     from sh_portal.sales import sales_bp
+
+    from .utils import MAX_QUANTITY
+    app.jinja_env.globals['MAX_QUANTITY'] = MAX_QUANTITY
+
+    @app.before_request
+    def reject_cross_origin_writes():
+        """Block POST/PUT/PATCH/DELETE whose Origin header names another site.
+
+        Browsers always send Origin on cross-site form posts and fetches, so this stops a
+        malicious page from making a logged-in admin's browser delete invoices etc. Requests
+        without an Origin header (scripts, tests) are not browser cross-site requests and pass.
+        """
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return None
+        origin = request.headers.get('Origin')
+        if not origin:
+            return None
+        allowed = {request.host, urlparse(app.config['OAUTH_REDIRECT_URI']).netloc}
+        allowed |= app.config['ALLOWED_ORIGIN_HOSTS']
+        if urlparse(origin).netloc in allowed - {''}:
+            return None
+        app.logger.warning(f"Blocked cross-origin {request.method} {request.path} from Origin {origin!r}")
+        return jsonify({'error': 'Cross-origin request blocked'}), 403
 
     app.register_blueprint(main)
     app.register_blueprint(seasons)

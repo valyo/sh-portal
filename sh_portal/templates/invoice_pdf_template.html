@@ -284,7 +284,7 @@
                 </td>
                 <td>
                     <div class="totals-block">
-                        <div><span class="label">Belopp före moms:</span> <span class="value">{{ "%.3f"|format(invoice.vat_net) }} kr</span></div>
+                        <div><span class="label">Belopp före moms:</span> <span class="value">{{ "%.2f"|format(invoice.vat_net) }} kr</span></div>
                         <div><span class="label">Total moms ({{ invoice.vat_rate }}%):</span> <span class="value">{{ "%.2f"|format(invoice.vat_amount) }} kr</span></div>
                         <div class="total">Summa att betala: {{ "%.2f"|format(invoice.tot_sum) }} kr</div>
                     </div>

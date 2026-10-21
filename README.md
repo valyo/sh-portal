@@ -204,6 +204,10 @@ Deploy using the production Docker Compose file and a pre-built image from GitHu
 
 Generated invoice PDFs are saved under `invoices/<andelsbiodling|lammandel>/<season year>/` next to the app (`/app/invoices` in the container, which is the `./data/invoices` volume). Set `INVOICES_DIR` in `.env` to store them somewhere else. The tests always use a temporary directory and never touch the real folder.
 
+### Cross-site request protection
+
+State-changing requests (POST/PUT/PATCH/DELETE) whose `Origin` header names a different site are rejected with 403, and the login cookie is `SameSite=Lax`. The portal's own host (the `Host` header and the host of `OAUTH_REDIRECT_URI`) is always allowed. If you reach the portal through a proxy that rewrites the `Host` header, list the public host name(s) in `ALLOWED_ORIGIN_HOSTS` (comma separated, e.g. `portal.example.org`).
+
 ### Production directory layout
 
 ```
