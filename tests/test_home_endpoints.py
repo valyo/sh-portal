@@ -1,4 +1,7 @@
 """Tests for home and auth-related endpoints."""
+from unittest.mock import MagicMock, patch
+
+from sh_portal.home import build_authorization_response
 
 
 class TestHome:
@@ -45,3 +48,78 @@ class TestLogin:
         rv = client.get("/login", follow_redirects=False)
         assert rv.status_code in (302, 303)
         assert "github" in rv.location.lower()
+
+
+class TestRequestHost:
+    """Werkzeug 3.1.7+ host validation vs the hosts this app actually uses."""
+
+    def test_localhost_keeps_full_request_url(self, app):
+        with app.test_request_context("/callback?code=abc", headers={"Host": "localhost:8087"}):
+            from flask import request
+            assert request.host == "localhost:8087"
+            assert request.url == "http://localhost:8087/callback?code=abc"
+
+    def test_public_host_keeps_full_request_url(self, app):
+        with app.test_request_context("/callback?code=abc", headers={"Host": "example.com"}):
+            from flask import request
+            assert request.host == "example.com"
+            assert request.url == "http://example.com/callback?code=abc"
+
+    def test_underscore_host_empties_request_host(self, app):
+        with app.test_request_context("/callback?code=abc", headers={"Host": "sh_portal:5000"}):
+            from flask import request
+            assert request.host == ""
+            assert request.url.startswith("http:///")
+
+
+class TestBuildAuthorizationResponse:
+    """OAuth callback URL must not depend on request.host."""
+
+    def test_appends_query_string(self):
+        assert build_authorization_response(
+            "http://localhost:8087/callback",
+            b"code=abc&state=xyz",
+        ) == "http://localhost:8087/callback?code=abc&state=xyz"
+
+    def test_empty_query_returns_redirect_uri(self):
+        assert build_authorization_response("http://localhost:8087/callback", b"") == (
+            "http://localhost:8087/callback"
+        )
+
+
+class TestCallback:
+    """GET /callback"""
+
+    def test_uses_configured_redirect_uri_when_host_has_underscore(self, client, app):
+        mock_oauth = MagicMock()
+        mock_oauth.fetch_token.return_value = {"access_token": "t"}
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"id": 999, "login": "nobody"}
+        mock_oauth.get.return_value = mock_resp
+
+        with patch("sh_portal.home.get_oauth", return_value=mock_oauth):
+            rv = client.get(
+                "/callback?code=abc&state=xyz",
+                headers={"Host": "sh_portal:5000"},
+            )
+
+        assert rv.status_code == 200
+        assert mock_oauth.fetch_token.call_args.kwargs["authorization_response"] == (
+            f"{app.config['OAUTH_REDIRECT_URI']}?code=abc&state=xyz"
+        )
+
+
+class TestMaxContentLength:
+    """Request body cap restores a limit after Werkzeug 3.1.9."""
+
+    def test_limit_is_configured(self, app):
+        assert app.config["MAX_CONTENT_LENGTH"] == 1024 * 1024
+
+    def test_rejects_oversized_post(self, logged_in_client, app):
+        app.config["MAX_CONTENT_LENGTH"] = 100
+        rv = logged_in_client.post(
+            "/api/mail-backend",
+            data=b'{"backend":"' + b"g" * 200 + b'"}',
+            content_type="application/json",
+        )
+        assert rv.status_code == 413

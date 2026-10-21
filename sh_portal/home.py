@@ -14,6 +14,19 @@ def get_oauth():
         scope=['user:email']
     )
 
+
+def build_authorization_response(redirect_uri, query_string):
+    """Build the OAuth authorization_response from the configured redirect URI.
+
+    Do not use request.url: Werkzeug 3.1.7+ clears request.host for invalid Host
+    characters (underscores in Docker names), which yields http:///….
+    """
+    if isinstance(query_string, (bytes, bytearray)):
+        query_string = query_string.decode()
+    if not query_string:
+        return redirect_uri
+    return f"{redirect_uri}?{query_string}"
+
 def _season_stats(latest_season):
     """Return dict with booking counts, total andelar, and new vs returning customers for a season."""
     if not latest_season:
@@ -113,7 +126,10 @@ def callback():
     token = oauth.fetch_token(
         current_app.config['GITHUB_TOKEN_URL'],
         client_secret=current_app.config['GITHUB_CLIENT_SECRET'],
-        authorization_response=request.url
+        authorization_response=build_authorization_response(
+            current_app.config['OAUTH_REDIRECT_URI'],
+            request.query_string,
+        ),
     )
 
     # Get user info from GitHub
