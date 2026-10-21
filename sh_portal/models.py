@@ -1,3 +1,4 @@
+import json
 from . import db
 from flask_login import UserMixin
 from sqlalchemy.sql import func
@@ -8,6 +9,7 @@ class Season(db.Model):
     year = db.Column(db.String(10))
     price = db.Column(db.Float, nullable=True)
     price_lamm = db.Column(db.Float, nullable=True)
+    price_lamm_2 = db.Column(db.Float, nullable=True)
     kg_honey = db.Column(db.Float, nullable=True)
     google_sheets_link_honey = db.Column(db.String(500), nullable=True)
     sheet_range_honey = db.Column(db.String(100), nullable=True)
@@ -101,6 +103,7 @@ class BookingsLamm(db.Model):
     certificate_quantity = db.Column(db.Integer, nullable=True)
     certificate_sent_at = db.Column(db.DateTime, nullable=True)
     delivered_at = db.Column(db.DateTime, nullable=True)
+    andel_tiers = db.Column(db.Text, nullable=True)
 
     season = db.relationship('Season', backref=db.backref('bookings_lamm', lazy=True))
     customer = db.relationship('Customer', backref=db.backref('bookings_lamm', lazy=True))
@@ -128,6 +131,24 @@ class BookingsLamm(db.Model):
     @property
     def ort(self):
         return self.customer.ort if self.customer else None
+
+    def get_andel_tiers(self):
+        """Price tier (1 or 2) per andel, padded/truncated to quantity; defaults to tier 1."""
+        try:
+            tiers = [int(t) for t in json.loads(self.andel_tiers)] if self.andel_tiers else []
+        except (ValueError, TypeError):
+            tiers = []
+        tiers = [t if t in (1, 2) else 1 for t in tiers][:self.quantity]
+        return tiers + [1] * (self.quantity - len(tiers))
+
+    def andel_prices(self, season=None):
+        """Unit price for each andel, resolved from the season's two Lammandel prices."""
+        season = season or self.season
+        price_2 = season.price_lamm_2 if season.price_lamm_2 is not None else season.price_lamm
+        return [price_2 if t == 2 else season.price_lamm for t in self.get_andel_tiers()]
+
+    def total_price(self, season=None):
+        return sum(self.andel_prices(season))
 
     def __repr__(self):
         return f'<BookingsLamm {self.name} - {self.season.year}>'
@@ -230,6 +251,16 @@ class InvoiceLamm(db.Model):
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices_lamm', lazy=True))
     booking = db.relationship('BookingsLamm', backref=db.backref('invoices_lamm', lazy=True))
+
+    @property
+    def line_items(self):
+        """One invoice row per distinct unit price: (quantity, unit_price, total)."""
+        prices = self.booking.andel_prices(self.season)
+        items = []
+        for price in sorted(set(prices)):
+            qty = prices.count(price)
+            items.append({'quantity': qty, 'unit_price': price, 'total': qty * price})
+        return items
 
     def __repr__(self):
         return f'<InvoiceLamm {self.invoice_id} for booking {self.booking_id}>'

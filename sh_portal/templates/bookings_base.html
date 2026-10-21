@@ -329,6 +329,13 @@
                             <input type="text" class="form-control" id="ort" name="ort" required>
                         </div>
                     </div>
+                    {% if page_title == 'Lammandel' %}
+                    <div class="mb-3" id="andelPricesSection">
+                        <label class="form-label">Price per andel</label>
+                        <div id="andelPriceRows" class="row g-2"></div>
+                        <div class="form-text">Invoice total: <strong id="andelPriceTotal">0</strong> kr</div>
+                    </div>
+                    {% endif %}
                     <div class="mb-3">
                         <label for="message" class="form-label">Message</label>
                         <textarea class="form-control" id="message" name="message" rows="3"></textarea>
@@ -565,6 +572,44 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Lammandel: per-andel price selection (price 1 / price 2 from the season)
+    let andelPriceOptions = null;
+    let andelTiers = [];
+    function renderAndelPrices() {
+        const rows = document.getElementById('andelPriceRows');
+        if (!rows || !andelPriceOptions) return;
+        const qty = Math.max(0, Math.min(200, parseInt(document.getElementById('quantity').value, 10) || 0));
+        andelTiers = andelTiers.slice(0, qty);
+        while (andelTiers.length < qty) andelTiers.push(1);
+        const hasPrice2 = andelPriceOptions['2'] !== null;
+        rows.innerHTML = '';
+        andelTiers.forEach((tier, i) => {
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-4';
+            const select = document.createElement('select');
+            select.className = 'form-select form-select-sm';
+            select.innerHTML = `<option value="1">Andel ${i + 1}: ${andelPriceOptions['1']} kr</option>` +
+                (hasPrice2 ? `<option value="2">Andel ${i + 1}: ${andelPriceOptions['2']} kr</option>` : '');
+            select.value = hasPrice2 && tier === 2 ? '2' : '1';
+            if (!hasPrice2) andelTiers[i] = 1;
+            select.addEventListener('change', () => {
+                andelTiers[i] = parseInt(select.value, 10);
+                updateAndelTotal();
+            });
+            col.appendChild(select);
+            rows.appendChild(col);
+        });
+        updateAndelTotal();
+    }
+    function updateAndelTotal() {
+        const totalEl = document.getElementById('andelPriceTotal');
+        if (!totalEl || !andelPriceOptions) return;
+        const total = andelTiers.reduce((sum, t) => sum + (t === 2 && andelPriceOptions['2'] !== null ? andelPriceOptions['2'] : andelPriceOptions['1']), 0);
+        totalEl.textContent = total;
+    }
+    const quantityInput = document.getElementById('quantity');
+    if (quantityInput) quantityInput.addEventListener('input', renderAndelPrices);
+
     // Individual manage booking buttons
     document.querySelectorAll('.manage-booking').forEach(button => {
         button.addEventListener('click', function() {
@@ -594,6 +639,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('certificate_quantity').value = data.certificate_quantity || '';
                     document.getElementById('certificate_sent').checked = !!data.certificate_sent_at;
                     document.getElementById('delivered').checked = !!data.delivered_at;
+                    andelPriceOptions = data.price_options || null;
+                    andelTiers = data.andel_tiers || [];
+                    renderAndelPrices();
 
                     // Store the payment status on the button itself
                     const certBtn = document.getElementById('sendCertificateBtn');
@@ -616,6 +664,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const bookingId = formData.get('booking_id');
         formData.set('certificate_sent', document.getElementById('certificate_sent').checked ? '1' : '0');
         formData.set('delivered', document.getElementById('delivered').checked ? '1' : '0');
+        if (document.getElementById('andelPricesSection')) {
+            formData.set('andel_tiers', JSON.stringify(andelTiers));
+        }
 
         // Determine the API prefix based on the page title
         const pageTitle = document.querySelector('h1').textContent.trim();

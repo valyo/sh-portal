@@ -9,6 +9,7 @@ from .utils import (
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
+import json
 from datetime import datetime, timedelta
 from flask_mail import Message
 
@@ -153,6 +154,11 @@ def get_booking(booking_id):
         'certificate_quantity': booking.certificate_quantity,
         'certificate_sent_at': booking.certificate_sent_at.isoformat() if booking.certificate_sent_at else None,
         'delivered_at': booking.delivered_at.isoformat() if booking.delivered_at else None,
+        'andel_tiers': booking.get_andel_tiers(),
+        'price_options': {
+            '1': booking.season.price_lamm,
+            '2': booking.season.price_lamm_2,
+        },
         'is_paid': is_paid
     })
 
@@ -184,6 +190,13 @@ def update_booking(booking_id):
                 booking.certificate_sent_at = datetime.utcnow()
         elif cert_mark == '0':
             booking.certificate_sent_at = None
+
+        raw_tiers = request.form.get('andel_tiers')
+        if raw_tiers is not None:
+            tiers = [int(t) for t in json.loads(raw_tiers)]
+            allow_tier_2 = booking.season.price_lamm_2 is not None
+            tiers = [2 if (t == 2 and allow_tier_2) else 1 for t in tiers]
+            booking.andel_tiers = json.dumps(tiers)
 
         delivered_mark = request.form.get('delivered')
         if delivered_mark == '1':
@@ -256,7 +269,7 @@ def send_invoices():
                     date_created=datetime.now(),
                     sent=False,  # Set to False initially
                     quantity=booking.quantity,
-                    tot_sum=season.price_lamm * booking.quantity
+                    tot_sum=booking.total_price(season)
                 )
                 db.session.add(invoice)
                 # Commit the invoice first

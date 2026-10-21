@@ -25,6 +25,7 @@ def get_season(season_id):
         'year': season.year,
         'price': season.price,
         'price_lamm': season.price_lamm,
+        'price_lamm_2': season.price_lamm_2,
         'kg_honey': season.kg_honey,
         'google_sheets_link_honey': season.google_sheets_link_honey,
         'sheet_range_honey': season.sheet_range_honey,
@@ -45,6 +46,8 @@ def update_season(season_id):
         season.year = request.form.get('year')
         season.price = float(request.form.get('price'))
         season.price_lamm = float(request.form.get('price_lamm'))
+        price_lamm_2 = request.form.get('price_lamm_2')
+        season.price_lamm_2 = float(price_lamm_2) if price_lamm_2 else None
         kg_honey = request.form.get('kg_honey')
         season.kg_honey = float(kg_honey) if kg_honey else None
         season.google_sheets_link_honey = request.form.get('google_sheets_link_honey')
@@ -92,6 +95,7 @@ def create_season():
     year = request.form.get('year')
     price = request.form.get('price')
     price_lamm = request.form.get('price_lamm')
+    price_lamm_2 = request.form.get('price_lamm_2')
     kg_honey = request.form.get('kg_honey')
     google_sheets_link_honey = request.form.get('google_sheets_link_honey')
     sheet_range_honey = request.form.get('sheet_range_honey')
@@ -109,6 +113,7 @@ def create_season():
         year=year,
         price=price,
         price_lamm=price_lamm,
+        price_lamm_2=float(price_lamm_2) if price_lamm_2 else None,
         kg_honey=float(kg_honey) if kg_honey else None,
         google_sheets_link_honey=google_sheets_link_honey,
         sheet_range_honey=sheet_range_honey,
