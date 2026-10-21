@@ -1,30 +1,14 @@
 """Tests for deleting an invoice (row, linked sale and saved PDF)."""
 import os
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture
-def lamm_invoice(app, season, customer):
-    from sh_portal.models import BookingsLamm, InvoiceLamm
-    from sh_portal import db
-    with app.app_context():
-        b = BookingsLamm(season_id=season.id, customer_id=customer.id, quantity=2)
-        db.session.add(b)
-        db.session.commit()
-        inv = InvoiceLamm(season_id=season.id, booking_id=b.id, invoice_id="F-LAMM-2025-0001",
-                          quantity=2, tot_sum=400.0)
-        db.session.add(inv)
-        db.session.commit()
-        db.session.refresh(inv)
-        yield inv
-
-
-@pytest.fixture
-def invoices_dir(app, tmp_path, monkeypatch):
-    """Point the app's invoices folder (<root_path>/../invoices) at a temp dir."""
-    monkeypatch.setattr(app, "root_path", str(tmp_path / "sh_portal"))
-    return tmp_path / "invoices"
+def invoices_dir(app):
+    """The app's (temporary) invoices folder, from app.config['INVOICES_DIR']."""
+    return Path(app.config["INVOICES_DIR"])
 
 
 def _touch(path):
@@ -82,7 +66,8 @@ class TestDeleteInvoiceAndelsbiodling:
         assert rv.status_code == 500
         assert "PDF could not be removed" in rv.get_json()["error"]
 
-    def test_booking_can_be_invoiced_again(self, logged_in_client, invoice, booking, season, app, invoices_dir, monkeypatch):
+    def test_booking_can_be_invoiced_again(self, logged_in_client, invoice, booking, season, app, invoices_dir, monkeypatch,
+                                           fake_invoice_pdf):
         logged_in_client.post(f"/api/invoice/{invoice.id}/delete")
         monkeypatch.setattr("sh_portal.andelsbiodling.send_mail_using_current_config", lambda *a, **k: None)
         rv = logged_in_client.post("/api/send-invoices", json={"booking_ids": [booking.id], "season_id": season.id, "vat_rate": 12})

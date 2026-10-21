@@ -7,7 +7,7 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    format_exception_location, delete_invoice_pdfs, create_booking_from_form, get_effective_mail_backend_with_source,
+    format_exception_location, delete_invoice_pdfs, invoice_pdf_path, create_booking_from_form, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
@@ -325,13 +325,18 @@ def send_invoices():
                     swish_qr_cid='swish_qr'
                 )
                 pdf_filename = f"{invoice.invoice_id}.pdf"
-                pdf_path = os.path.join(current_app.root_path, '..', 'invoices', 'andelsbiodling', str(season.year), pdf_filename)
+                pdf_path = invoice_pdf_path('andelsbiodling', season.year, invoice.invoice_id)
 
                 # Save the PDF to file
-                if generate_invoice_pdf(pdf_html, pdf_path):
-                    # Attach the PDF to the email
-                    with open(pdf_path, 'rb') as fp:
-                        msg.attach(pdf_filename, 'application/pdf', fp.read())
+                if not generate_invoice_pdf(pdf_html, pdf_path):
+                    error_msg = f"Failed to generate PDF for booking {booking.id}"
+                    current_app.logger.error(error_msg)
+                    errors.append(error_msg)
+                    db.session.delete(invoice)
+                    db.session.commit()
+                    continue
+                with open(pdf_path, 'rb') as fp:
+                    msg.attach(pdf_filename, 'application/pdf', fp.read())
 
                 effective, source = get_effective_mail_backend_with_source(current_app)
                 params = get_mail_connection_params(effective)

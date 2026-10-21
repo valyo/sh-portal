@@ -363,13 +363,18 @@ def get_sheet_data(sheet_id, range_name):
 
     return result.get('values', [])
 
+def invoice_pdf_path(kind, season_year, invoice_id):
+    """Path of an invoice's PDF: <INVOICES_DIR>/<kind>/<season year>/<invoice_id>.pdf."""
+    return os.path.join(current_app.config['INVOICES_DIR'], kind, str(season_year), f"{invoice_id}.pdf")
+
+
 def delete_invoice_pdfs(kind, invoice_id):
     """Delete the saved PDF for an invoice from every season folder under invoices/<kind>/.
 
     kind is 'andelsbiodling' or 'lammandel'. Returns the list of removed file paths.
     """
     filename = f"{invoice_id}.pdf"
-    base = os.path.abspath(os.path.join(current_app.root_path, '..', 'invoices', kind))
+    base = os.path.join(current_app.config['INVOICES_DIR'], kind)
     if os.path.basename(filename) != filename or not os.path.isdir(base):
         return []
     removed = []

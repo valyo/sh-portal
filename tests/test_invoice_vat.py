@@ -1,5 +1,6 @@
 """Tests for choosing the VAT rate (6 or 12) when sending invoices."""
 import datetime
+import os
 
 import pytest
 
@@ -14,6 +15,11 @@ def lamm_booking(app, season, customer):
         db.session.commit()
         db.session.refresh(b)
         yield b
+
+
+@pytest.fixture(autouse=True)
+def _no_real_pdf(fake_invoice_pdf):
+    """These tests are about VAT, not PDF rendering (see tests/test_pdf_generation.py)."""
 
 
 def _render_pdf_html(app, invoice):
@@ -71,6 +77,19 @@ class TestInvoiceVat:
                 assert f"{inv.vat_amount:.2f} kr" in html
                 assert f"{inv.vat_net:.3f} kr" in html
 
+    def test_pdf_is_saved_under_configured_invoices_dir(self, request, logged_in_client, season, app, monkeypatch,
+                                                         fake_invoice_pdf, url, module, model_name,
+                                                         booking_fixture, total):
+        booking = request.getfixturevalue(booking_fixture)
+        rv = self._send(logged_in_client, monkeypatch, module, url, booking, season, vat_rate=12)
+        assert rv.status_code == 200
+        kind = module.rsplit(".", 1)[-1]
+        with app.app_context():
+            invoice_number = self._invoice(app, model_name, booking).invoice_id
+        expected = os.path.join(app.config["INVOICES_DIR"], kind, str(season.year), f"{invoice_number}.pdf")
+        assert fake_invoice_pdf == [expected]
+        assert os.path.isfile(expected)
+
     def test_missing_rate_rejected(self, request, logged_in_client, season, app, monkeypatch,
                                    url, module, model_name, booking_fixture, total):
         booking = request.getfixturevalue(booking_fixture)
@@ -90,3 +109,23 @@ class TestInvoiceVat:
         with app.app_context():
             from sh_portal import models
             assert getattr(models, model_name).query.count() == 0
+
+    def test_pdf_failure_does_not_send_or_keep_invoice(self, request, logged_in_client, season, app,
+                                                       monkeypatch, url, module, model_name,
+                                                       booking_fixture, total):
+        booking = request.getfixturevalue(booking_fixture)
+        sent = []
+        monkeypatch.setattr(f"{module}.generate_invoice_pdf", lambda *a, **k: False)
+        monkeypatch.setattr(f"{module}.send_mail_using_current_config", lambda *a, **k: sent.append(1))
+        rv = logged_in_client.post(
+            url,
+            json={"booking_ids": [booking.id], "season_id": season.id, "vat_rate": 12},
+        )
+        assert rv.status_code == 200
+        assert sent == []
+        data = rv.get_json()
+        assert data.get("errors")
+        assert any("PDF" in err for err in data["errors"])
+        with app.app_context():
+            from sh_portal import models
+            assert getattr(models, model_name).query.filter_by(booking_id=booking.id).count() == 0

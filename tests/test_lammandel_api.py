@@ -79,7 +79,8 @@ class TestBookingPrices:
 
 
 class TestInvoiceTotal:
-    def test_invoice_is_sum_of_andel_prices(self, logged_in_client, lamm_booking, season, app, monkeypatch):
+    def test_invoice_is_sum_of_andel_prices(self, logged_in_client, lamm_booking, season, app, monkeypatch,
+                                           fake_invoice_pdf):
         monkeypatch.setattr("sh_portal.lammandel.send_mail_using_current_config", lambda *a, **k: None)
         logged_in_client.post(
             f"/lammandel/api/booking/{lamm_booking.id}",
