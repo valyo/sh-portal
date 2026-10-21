@@ -4,8 +4,8 @@ import pytest
 
 
 @pytest.fixture
-def app():
-    """Create application for testing. Uses in-memory SQLite so the real DB is never touched."""
+def app(tmp_path):
+    """Create application for testing. Uses in-memory SQLite and a temp invoices dir, so the real DB and invoices/ are never touched."""
     # Force in-memory DB before create_app() so db.create_all() runs on :memory:, not .env DATABASE_URL
     prev_db = os.environ.pop('DATABASE_URL', None)
     os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
@@ -13,6 +13,7 @@ def app():
         from sh_portal import create_app
         app = create_app()
         app.config['TESTING'] = True
+        app.config['INVOICES_DIR'] = str(tmp_path / 'invoices')
         app.config['WTF_CSRF_ENABLED'] = False
         app.config['MAIL_BACKEND'] = os.getenv('MAIL_BACKEND', 'mailcatcher')
         return app
@@ -192,3 +193,43 @@ def sale_from_invoice(app, product, sale_category, invoice, customer):
         db.session.commit()
         db.session.refresh(s)
         yield s
+
+
+@pytest.fixture
+def fake_invoice_pdf(monkeypatch):
+    """Replace WeasyPrint in the send-invoices views with a stub that writes a tiny placeholder file.
+
+    For tests that are about invoices/VAT/prices, not PDF rendering; real rendering is
+    covered by tests/test_pdf_generation.py. Records the paths it was asked to write.
+    """
+    paths = []
+
+    def _fake(html_content, output_path):
+        import os
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, 'wb') as fp:
+            fp.write(b'%PDF-1.4 stub')
+        paths.append(output_path)
+        return True
+
+    monkeypatch.setattr('sh_portal.andelsbiodling.generate_invoice_pdf', _fake)
+    monkeypatch.setattr('sh_portal.lammandel.generate_invoice_pdf', _fake)
+    return paths
+
+
+@pytest.fixture
+def lamm_invoice(app, season, customer):
+    """One Lammandel booking (quantity 2, season price_lamm) with an invoice."""
+    from sh_portal.models import BookingsLamm, InvoiceLamm
+    from sh_portal import db
+    with app.app_context():
+        b = BookingsLamm(season_id=season.id, customer_id=customer.id, quantity=2)
+        db.session.add(b)
+        db.session.commit()
+        inv = InvoiceLamm(season_id=season.id, booking_id=b.id, invoice_id="F-LAMM-2025-0001",
+                          quantity=2, tot_sum=400.0)
+        db.session.add(inv)
+        db.session.commit()
+        db.session.refresh(inv)
+        yield inv
+

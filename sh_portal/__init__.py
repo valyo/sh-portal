@@ -51,6 +51,11 @@ def create_app():
     # (3.1.9+); cap the whole request body instead.
     app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 
+    # Where generated invoice PDFs are stored: <INVOICES_DIR>/<andelsbiodling|lammandel>/<season year>/
+    app.config['INVOICES_DIR'] = os.path.abspath(
+        os.getenv('INVOICES_DIR') or os.path.join(app.root_path, '..', 'invoices')
+    )
+
     # Mail configuration: MAIL_BACKEND=mailcatcher (default) or google
     mail_backend = os.getenv('MAIL_BACKEND', 'mailcatcher').lower()
     if mail_backend == 'google':

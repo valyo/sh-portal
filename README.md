@@ -200,6 +200,10 @@ Deploy using the production Docker Compose file and a pre-built image from GitHu
    docker compose run --rm --entrypoint "" app flask db upgrade
    ```
 
+### Invoice PDF location
+
+Generated invoice PDFs are saved under `invoices/<andelsbiodling|lammandel>/<season year>/` next to the app (`/app/invoices` in the container, which is the `./data/invoices` volume). Set `INVOICES_DIR` in `.env` to store them somewhere else. The tests always use a temporary directory and never touch the real folder.
+
 ### Production directory layout
 
 ```
