@@ -243,7 +243,7 @@ class TestSendInvoices:
     def test_invalid_season_returns_400(self, logged_in_client, booking):
         rv = logged_in_client.post(
             "/api/send-invoices",
-            json={"booking_ids": [booking.id], "season_id": 99999},
+            json={"booking_ids": [booking.id], "season_id": 99999, "vat_rate": 12},
             content_type="application/json",
         )
         assert rv.status_code == 400

@@ -85,7 +85,7 @@ class TestDeleteInvoiceAndelsbiodling:
     def test_booking_can_be_invoiced_again(self, logged_in_client, invoice, booking, season, app, invoices_dir, monkeypatch):
         logged_in_client.post(f"/api/invoice/{invoice.id}/delete")
         monkeypatch.setattr("sh_portal.andelsbiodling.send_mail_using_current_config", lambda *a, **k: None)
-        rv = logged_in_client.post("/api/send-invoices", json={"booking_ids": [booking.id], "season_id": season.id})
+        rv = logged_in_client.post("/api/send-invoices", json={"booking_ids": [booking.id], "season_id": season.id, "vat_rate": 12})
         assert rv.status_code == 200
         with app.app_context():
             from sh_portal.models import Invoice

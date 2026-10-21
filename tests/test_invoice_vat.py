@@ -71,13 +71,15 @@ class TestInvoiceVat:
                 assert f"{inv.vat_amount:.2f} kr" in html
                 assert f"{inv.vat_net:.3f} kr" in html
 
-    def test_defaults_to_12(self, request, logged_in_client, season, app, monkeypatch,
-                            url, module, model_name, booking_fixture, total):
+    def test_missing_rate_rejected(self, request, logged_in_client, season, app, monkeypatch,
+                                   url, module, model_name, booking_fixture, total):
         booking = request.getfixturevalue(booking_fixture)
         rv = self._send(logged_in_client, monkeypatch, module, url, booking, season)
-        assert rv.status_code == 200
+        assert rv.status_code == 400
+        assert "select a VAT rate" in rv.get_json()["error"]
         with app.app_context():
-            assert self._invoice(app, model_name, booking).vat_rate == 12
+            from sh_portal import models
+            assert getattr(models, model_name).query.count() == 0
 
     @pytest.mark.parametrize("bad", [25, 0, "abc", None])
     def test_invalid_rate_rejected(self, request, logged_in_client, season, app, monkeypatch,

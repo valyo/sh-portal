@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
-from .models import Season, Bookings, Invoice, Sale, Product, SaleCategory, VAT_RATES, DEFAULT_VAT_RATE
+from .models import Season, Bookings, Invoice, Sale, Product, SaleCategory, VAT_RATES
 from . import db
 import pandas as pd
 from datetime import datetime, timedelta
@@ -239,11 +239,11 @@ def send_invoices():
         return jsonify({'error': 'No season selected'}), 400
 
     try:
-        vat_rate = int(request.json.get('vat_rate', DEFAULT_VAT_RATE))
+        vat_rate = int(request.json.get('vat_rate'))
     except (TypeError, ValueError):
         vat_rate = None
     if vat_rate not in VAT_RATES:
-        return jsonify({'error': f'VAT must be one of {", ".join(str(v) for v in VAT_RATES)}'}), 400
+        return jsonify({'error': f'Please select a VAT rate ({" or ".join(str(v) for v in VAT_RATES)})'}), 400
 
     season = db.session.get(Season, season_id)
     if not season:

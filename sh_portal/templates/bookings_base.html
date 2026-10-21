@@ -145,8 +145,9 @@
                                     </button>
                                     <label for="invoiceVat" class="form-label mb-0 ms-2">VAT</label>
                                     <select class="form-select w-auto" id="invoiceVat">
+                                        <option value="" selected disabled>Select…</option>
                                         <option value="6">6%</option>
-                                        <option value="12" selected>12%</option>
+                                        <option value="12">12%</option>
                                     </select>
                                 </div>
                                 <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
@@ -538,6 +539,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    const invoiceVatSelect = document.getElementById('invoiceVat');
+    if (invoiceVatSelect) invoiceVatSelect.addEventListener('change', () => invoiceVatSelect.classList.remove('is-invalid'));
+
     // Send invoice button click handler
     if (sendInvoiceBtn) sendInvoiceBtn.addEventListener('click', function() {
         const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
@@ -545,6 +549,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (selectedBookings.length === 0) {
             showNotification('Please select at least one booking', true);
+            return;
+        }
+
+        const vatSelect = document.getElementById('invoiceVat');
+        if (!vatSelect.value) {
+            vatSelect.classList.add('is-invalid');
+            vatSelect.focus();
+            showNotification('Please select a VAT rate before sending invoices', true);
             return;
         }
 
@@ -571,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify({
                 booking_ids: selectedBookings,
                 season_id: seasonId,
-                vat_rate: parseInt(document.getElementById('invoiceVat').value, 10)
+                vat_rate: parseInt(vatSelect.value, 10)
             })
         })
         .then(response => response.json())
