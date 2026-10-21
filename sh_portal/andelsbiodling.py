@@ -7,7 +7,7 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    format_exception_location, get_effective_mail_backend_with_source,
+    format_exception_location, delete_invoice_pdfs, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
@@ -438,3 +438,35 @@ def update_invoice_payment(invoice_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)})
+
+@andelsbiodling.route('/api/invoice/<int:invoice_id>/delete', methods=['POST'])
+def delete_invoice(invoice_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    invoice = db.session.get(Invoice, invoice_id)
+    if invoice is None:
+        abort(404)
+    number = invoice.invoice_id
+
+    try:
+        for sale in Sale.query.filter_by(invoice_id=invoice.id).all():
+            db.session.delete(sale)
+        db.session.delete(invoice)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting invoice {number}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    try:
+        delete_invoice_pdfs('andelsbiodling', number)
+    except OSError as e:
+        current_app.logger.error(f"Invoice {number} deleted but PDF removal failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Invoice {number} was deleted, but its PDF could not be removed: {e}'
+        }), 500
+
+    flash(f'Invoice {number} deleted.', 'success')
+    return jsonify({'success': True, 'message': f'Invoice {number} deleted'})

@@ -363,6 +363,24 @@ def get_sheet_data(sheet_id, range_name):
 
     return result.get('values', [])
 
+def delete_invoice_pdfs(kind, invoice_id):
+    """Delete the saved PDF for an invoice from every season folder under invoices/<kind>/.
+
+    kind is 'andelsbiodling' or 'lammandel'. Returns the list of removed file paths.
+    """
+    filename = f"{invoice_id}.pdf"
+    base = os.path.abspath(os.path.join(current_app.root_path, '..', 'invoices', kind))
+    if os.path.basename(filename) != filename or not os.path.isdir(base):
+        return []
+    removed = []
+    for entry in os.scandir(base):
+        path = os.path.join(entry.path, filename)
+        if entry.is_dir() and os.path.isfile(path):
+            os.remove(path)
+            removed.append(path)
+    return removed
+
+
 def generate_invoice_pdf(html_content, output_path):
     """
     Converts HTML content to a PDF file using WeasyPrint.
