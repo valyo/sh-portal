@@ -4,6 +4,22 @@ from flask_login import UserMixin
 from sqlalchemy.sql import func
 
 
+VAT_RATES = (6, 12)
+DEFAULT_VAT_RATE = 12
+
+
+class VatMixin:
+    """Invoice totals are VAT-inclusive; derive net and VAT amounts from vat_rate."""
+
+    @property
+    def vat_net(self):
+        return self.tot_sum / (1 + self.vat_rate / 100)
+
+    @property
+    def vat_amount(self):
+        return self.tot_sum - self.vat_net
+
+
 class Season(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     year = db.Column(db.String(10))
@@ -141,6 +157,12 @@ class BookingsLamm(db.Model):
         tiers = [t if t in (1, 2) else 1 for t in tiers][:self.quantity]
         return tiers + [1] * (self.quantity - len(tiers))
 
+    def set_andel_tiers(self, raw_json):
+        """Store per-andel price tiers from a JSON list; tier 2 is only allowed if the season has a second price."""
+        allow_tier_2 = self.season.price_lamm_2 is not None
+        tiers = [2 if (int(t) == 2 and allow_tier_2) else 1 for t in json.loads(raw_json)]
+        self.andel_tiers = json.dumps(tiers)
+
     def andel_prices(self, season=None):
         """Unit price for each andel, resolved from the season's two Lammandel prices."""
         season = season or self.season
@@ -154,7 +176,7 @@ class BookingsLamm(db.Model):
         return f'<BookingsLamm {self.name} - {self.season.year}>'
 
 
-class Invoice(db.Model):
+class Invoice(VatMixin, db.Model):
     __tablename__ = 'invoices'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -166,6 +188,7 @@ class Invoice(db.Model):
     date_payed = db.Column(db.DateTime, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
+    vat_rate = db.Column(db.Integer, nullable=False, default=DEFAULT_VAT_RATE, server_default=str(DEFAULT_VAT_RATE))
 
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices', lazy=True))
@@ -235,7 +258,7 @@ class Sale(db.Model):
         return f'<Sale {self.id} {self.timestamp.date()} {self.display_customer}>'
 
 
-class InvoiceLamm(db.Model):
+class InvoiceLamm(VatMixin, db.Model):
     __tablename__ = 'invoices_lamm'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -247,6 +270,7 @@ class InvoiceLamm(db.Model):
     date_payed = db.Column(db.DateTime, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
+    vat_rate = db.Column(db.Integer, nullable=False, default=DEFAULT_VAT_RATE, server_default=str(DEFAULT_VAT_RATE))
 
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices_lamm', lazy=True))

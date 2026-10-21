@@ -130,13 +130,25 @@
                 <div class="tab-content mt-3" id="myTabContent">
                     <!-- Bookings Tab -->
                     <div class="tab-pane fade show active" id="bookings" role="tabpanel" aria-labelledby="bookings-tab">
-                        <h3>Bookings for {{ selected_season.year }}</h3>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 class="mb-0">Bookings for {{ selected_season.year }}</h3>
+                            <button type="button" class="btn btn-outline-primary" id="newBookingBtn"
+                                    {% if page_title == 'Lammandel' %}data-price-options='{{ {"1": selected_season.price_lamm, "2": selected_season.price_lamm_2} | tojson }}'{% endif %}>
+                                <i class="bi bi-plus-lg"></i> New booking
+                            </button>
+                        </div>
                         {% if bookings %}
                             <form id="bookingsForm" method="POST">
-                                <div class="mb-3">
+                                <div class="mb-3 d-flex align-items-center gap-2">
                                     <button type="button" class="btn btn-primary" id="sendInvoiceBtn" disabled>
                                         <i class="bi bi-envelope"></i> Send Invoice
                                     </button>
+                                    <label for="invoiceVat" class="form-label mb-0 ms-2">VAT</label>
+                                    <select class="form-select w-auto" id="invoiceVat">
+                                        <option value="" selected disabled>Select…</option>
+                                        <option value="6">6%</option>
+                                        <option value="12">12%</option>
+                                    </select>
                                 </div>
                                 <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
                                     <table class="table table-hover">
@@ -230,6 +242,7 @@
                                             <th>Date Paid</th>
                                             <th>Quantity</th>
                                             <th>Total Sum</th>
+                                            <th>VAT</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -243,6 +256,7 @@
                                             <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
                                             <td>{{ invoice.booking.quantity }}</td>
                                             <td>{{ invoice.tot_sum }}</td>
+                                            <td>{{ invoice.vat_rate }}%</td>
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                         data-bs-toggle="modal" data-bs-target="#manageInvoiceModal"
@@ -328,6 +342,11 @@
                             <label for="ort" class="form-label">Ort</label>
                             <input type="text" class="form-control" id="ort" name="ort" required>
                         </div>
+                    </div>
+                    <div class="mb-3 d-none" id="bookingDateGroup">
+                        <label for="booking_date" class="form-label">Booking date</label>
+                        <input type="datetime-local" class="form-control" id="booking_date" name="booking_date">
+                        <div class="form-text">Defaults to now.</div>
                     </div>
                     {% if page_title == 'Lammandel' %}
                     <div class="mb-3" id="andelPricesSection">
@@ -415,6 +434,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto" id="deleteInvoiceBtn">
+                        <i class="bi bi-trash"></i> Delete invoice
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -517,6 +539,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    const invoiceVatSelect = document.getElementById('invoiceVat');
+    if (invoiceVatSelect) invoiceVatSelect.addEventListener('change', () => invoiceVatSelect.classList.remove('is-invalid'));
+
     // Send invoice button click handler
     if (sendInvoiceBtn) sendInvoiceBtn.addEventListener('click', function() {
         const selectedBookings = Array.from(document.querySelectorAll('.booking-checkbox:checked'))
@@ -524,6 +549,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (selectedBookings.length === 0) {
             showNotification('Please select at least one booking', true);
+            return;
+        }
+
+        const vatSelect = document.getElementById('invoiceVat');
+        if (!vatSelect.value) {
+            vatSelect.classList.add('is-invalid');
+            vatSelect.focus();
+            showNotification('Please select a VAT rate before sending invoices', true);
             return;
         }
 
@@ -549,7 +582,8 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 booking_ids: selectedBookings,
-                season_id: seasonId
+                season_id: seasonId,
+                vat_rate: parseInt(vatSelect.value, 10)
             })
         })
         .then(response => response.json())
@@ -610,11 +644,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const quantityInput = document.getElementById('quantity');
     if (quantityInput) quantityInput.addEventListener('input', renderAndelPrices);
 
+    // The booking modal is used both to edit a booking and to create a new one
+    let bookingModalMode = 'edit';
+    function setBookingModalMode(mode) {
+        bookingModalMode = mode;
+        const creating = mode === 'create';
+        document.getElementById('manageBookingModalLabel').textContent = creating ? 'New Booking' : 'Manage Booking';
+        document.getElementById('bookingDateGroup').classList.toggle('d-none', !creating);
+        document.getElementById('sendCertificateBtn').classList.toggle('d-none', creating);
+    }
+
+    const newBookingBtn = document.getElementById('newBookingBtn');
+    if (newBookingBtn) newBookingBtn.addEventListener('click', function() {
+        manageBookingForm.reset();
+        setBookingModalMode('create');
+        document.getElementById('bookingId').value = '';
+        document.getElementById('quantity').value = 1;
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('booking_date').value = now.toISOString().slice(0, 16);
+        if (this.dataset.priceOptions) {
+            andelPriceOptions = JSON.parse(this.dataset.priceOptions);
+            andelTiers = [];
+            renderAndelPrices();
+        }
+        if (manageBookingModal) manageBookingModal.show();
+    });
+
     // Individual manage booking buttons
     document.querySelectorAll('.manage-booking').forEach(button => {
         button.addEventListener('click', function() {
             const bookingId = this.dataset.bookingId;
             const row = this.closest('tr');
+            setBookingModalMode('edit');
 
             // Populate form with booking data
             document.getElementById('bookingId').value = bookingId;
@@ -672,7 +734,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const pageTitle = document.querySelector('h1').textContent.trim();
         const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
 
-        fetch(`${apiPrefix}/api/booking/${bookingId}`, {
+        const creating = bookingModalMode === 'create';
+        if (creating) {
+            formData.set('season_id', document.getElementById('season_id').value);
+        }
+        const url = creating ? `${apiPrefix}/api/booking` : `${apiPrefix}/api/booking/${bookingId}`;
+        const action = creating ? 'creating' : 'updating';
+
+        fetch(url, {
             method: 'POST',
             body: formData
         })
@@ -682,12 +751,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Reload preserving the season selection
                 reloadWithSeason();
             } else {
-                showNotification('Error updating booking: ' + data.message, true);
+                showNotification(`Error ${action} booking: ` + data.message, true);
             }
         })
         .catch(error => {
-            console.error('Error updating booking:', error);
-            showNotification('Error updating booking', true);
+            console.error(`Error ${action} booking:`, error);
+            showNotification(`Error ${action} booking`, true);
         });
     });
 
@@ -702,6 +771,31 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Delete invoice (removes the invoice, its sale and the saved PDF)
+    document.getElementById('deleteInvoiceBtn').addEventListener('click', function() {
+        const invoiceId = document.getElementById('manageInvoiceId').value;
+        const invoiceNumber = document.getElementById('manageInvoiceNumber').value;
+        if (!confirm(`Delete invoice ${invoiceNumber}?\n\nThe invoice, its saved PDF and any sale created from it will be permanently removed. An email already sent to the customer cannot be recalled.`)) {
+            return;
+        }
+        const pageTitle = document.querySelector('h1').textContent.trim();
+        const apiPrefix = pageTitle === 'Lammandel' ? '/lammandel' : '';
+
+        fetch(`${apiPrefix}/api/invoice/${invoiceId}/delete`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                reloadWithSeason('invoices');
+            } else {
+                showNotification('Error: ' + (data.error || 'Failed to delete invoice'), true);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Error deleting invoice', true);
+        });
+    });
 
     // Handle manage invoice form submission
     const manageInvoiceForm = document.getElementById('manageInvoiceForm');

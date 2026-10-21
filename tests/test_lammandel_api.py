@@ -87,7 +87,7 @@ class TestInvoiceTotal:
         )
         rv = logged_in_client.post(
             "/lammandel/api/send-invoices",
-            json={"booking_ids": [lamm_booking.id], "season_id": season.id},
+            json={"booking_ids": [lamm_booking.id], "season_id": season.id, "vat_rate": 12},
         )
         assert rv.status_code == 200
         with app.app_context():

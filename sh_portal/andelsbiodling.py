@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
-from .models import Season, Bookings, Invoice, Sale, Product, SaleCategory
+from .models import Season, Bookings, Invoice, Sale, Product, SaleCategory, VAT_RATES
 from . import db
 import pandas as pd
 from datetime import datetime, timedelta
@@ -7,7 +7,7 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    format_exception_location, get_effective_mail_backend_with_source,
+    format_exception_location, delete_invoice_pdfs, create_booking_from_form, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
@@ -238,6 +238,13 @@ def send_invoices():
         current_app.logger.error("No season ID provided")
         return jsonify({'error': 'No season selected'}), 400
 
+    try:
+        vat_rate = int(request.json.get('vat_rate'))
+    except (TypeError, ValueError):
+        vat_rate = None
+    if vat_rate not in VAT_RATES:
+        return jsonify({'error': f'Please select a VAT rate ({" or ".join(str(v) for v in VAT_RATES)})'}), 400
+
     season = db.session.get(Season, season_id)
     if not season:
         current_app.logger.error(f"Season {season_id} not found")
@@ -277,7 +284,8 @@ def send_invoices():
                     date_created=datetime.now(),
                     sent=False,  # Set to False initially
                     quantity=booking.quantity,
-                    tot_sum=season.price * booking.quantity
+                    tot_sum=season.price * booking.quantity,
+                    vat_rate=vat_rate
                 )
                 db.session.add(invoice)
                 # Commit the invoice first
@@ -430,3 +438,54 @@ def update_invoice_payment(invoice_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)})
+
+@andelsbiodling.route('/api/invoice/<int:invoice_id>/delete', methods=['POST'])
+def delete_invoice(invoice_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    invoice = db.session.get(Invoice, invoice_id)
+    if invoice is None:
+        abort(404)
+    number = invoice.invoice_id
+
+    try:
+        for sale in Sale.query.filter_by(invoice_id=invoice.id).all():
+            db.session.delete(sale)
+        db.session.delete(invoice)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting invoice {number}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    try:
+        delete_invoice_pdfs('andelsbiodling', number)
+    except OSError as e:
+        current_app.logger.error(f"Invoice {number} deleted but PDF removal failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Invoice {number} was deleted, but its PDF could not be removed: {e}'
+        }), 500
+
+    flash(f'Invoice {number} deleted.', 'success')
+    return jsonify({'success': True, 'message': f'Invoice {number} deleted'})
+
+@andelsbiodling.route('/api/booking', methods=['POST'])
+def create_booking():
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        booking, error = create_booking_from_form(db, Bookings, request.form)
+        if error:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': error}), 400
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error creating booking: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    flash('Booking created successfully', 'success')
+    return jsonify({'success': True, 'booking_id': booking.id})
