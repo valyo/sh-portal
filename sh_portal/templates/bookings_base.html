@@ -133,10 +133,15 @@
                         <h3>Bookings for {{ selected_season.year }}</h3>
                         {% if bookings %}
                             <form id="bookingsForm" method="POST">
-                                <div class="mb-3">
+                                <div class="mb-3 d-flex align-items-center gap-2">
                                     <button type="button" class="btn btn-primary" id="sendInvoiceBtn" disabled>
                                         <i class="bi bi-envelope"></i> Send Invoice
                                     </button>
+                                    <label for="invoiceVat" class="form-label mb-0 ms-2">VAT</label>
+                                    <select class="form-select w-auto" id="invoiceVat">
+                                        <option value="6">6%</option>
+                                        <option value="12" selected>12%</option>
+                                    </select>
                                 </div>
                                 <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
                                     <table class="table table-hover">
@@ -230,6 +235,7 @@
                                             <th>Date Paid</th>
                                             <th>Quantity</th>
                                             <th>Total Sum</th>
+                                            <th>VAT</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -243,6 +249,7 @@
                                             <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
                                             <td>{{ invoice.booking.quantity }}</td>
                                             <td>{{ invoice.tot_sum }}</td>
+                                            <td>{{ invoice.vat_rate }}%</td>
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                         data-bs-toggle="modal" data-bs-target="#manageInvoiceModal"
@@ -549,7 +556,8 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 booking_ids: selectedBookings,
-                season_id: seasonId
+                season_id: seasonId,
+                vat_rate: parseInt(document.getElementById('invoiceVat').value, 10)
             })
         })
         .then(response => response.json())

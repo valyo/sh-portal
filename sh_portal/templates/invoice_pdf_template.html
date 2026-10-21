@@ -256,7 +256,7 @@
                         <td>Lammandel</td>
                         <td>{{ item.quantity }}</td>
                         <td>{{ "%.2f"|format(item.unit_price) }} kr</td>
-                        <td>12%</td>
+                        <td>{{ invoice.vat_rate }}%</td>
                         <td>{{ "%.2f"|format(item.total) }} kr</td>
                     </tr>
                     {% endfor %}
@@ -265,7 +265,7 @@
                         <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andel av honungsskörden ' ~ invoice.season.year if invoice.season else '' }}</td>
                         <td>{{ invoice.quantity }}</td>
                         <td>{{ "%.2f"|format(invoice.season.price_lamm if 'LAMM' in invoice.invoice_id and invoice.season else invoice.season.price if invoice.season else 0) }} kr</td>
-                        <td>12%</td>
+                        <td>{{ invoice.vat_rate }}%</td>
                         <td>{{ "%.2f"|format(invoice.tot_sum) }} kr</td>
                     </tr>
                     {% endif %}
@@ -284,8 +284,8 @@
                 </td>
                 <td>
                     <div class="totals-block">
-                        <div><span class="label">Belopp före moms:</span> <span class="value">{{ "%.3f"|format(invoice.tot_sum / 1.12) }} kr</span></div>
-                        <div><span class="label">Total moms (12%):</span> <span class="value">{{ "%.2f"|format(invoice.tot_sum - (invoice.tot_sum / 1.12)) }} kr</span></div>
+                        <div><span class="label">Belopp före moms:</span> <span class="value">{{ "%.3f"|format(invoice.vat_net) }} kr</span></div>
+                        <div><span class="label">Total moms ({{ invoice.vat_rate }}%):</span> <span class="value">{{ "%.2f"|format(invoice.vat_amount) }} kr</span></div>
                         <div class="total">Summa att betala: {{ "%.2f"|format(invoice.tot_sum) }} kr</div>
                     </div>
                 </td>

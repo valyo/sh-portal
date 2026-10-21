@@ -4,6 +4,22 @@ from flask_login import UserMixin
 from sqlalchemy.sql import func
 
 
+VAT_RATES = (6, 12)
+DEFAULT_VAT_RATE = 12
+
+
+class VatMixin:
+    """Invoice totals are VAT-inclusive; derive net and VAT amounts from vat_rate."""
+
+    @property
+    def vat_net(self):
+        return self.tot_sum / (1 + self.vat_rate / 100)
+
+    @property
+    def vat_amount(self):
+        return self.tot_sum - self.vat_net
+
+
 class Season(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     year = db.Column(db.String(10))
@@ -154,7 +170,7 @@ class BookingsLamm(db.Model):
         return f'<BookingsLamm {self.name} - {self.season.year}>'
 
 
-class Invoice(db.Model):
+class Invoice(VatMixin, db.Model):
     __tablename__ = 'invoices'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -166,6 +182,7 @@ class Invoice(db.Model):
     date_payed = db.Column(db.DateTime, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
+    vat_rate = db.Column(db.Integer, nullable=False, default=DEFAULT_VAT_RATE, server_default=str(DEFAULT_VAT_RATE))
 
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices', lazy=True))
@@ -235,7 +252,7 @@ class Sale(db.Model):
         return f'<Sale {self.id} {self.timestamp.date()} {self.display_customer}>'
 
 
-class InvoiceLamm(db.Model):
+class InvoiceLamm(VatMixin, db.Model):
     __tablename__ = 'invoices_lamm'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -247,6 +264,7 @@ class InvoiceLamm(db.Model):
     date_payed = db.Column(db.DateTime, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
+    vat_rate = db.Column(db.Integer, nullable=False, default=DEFAULT_VAT_RATE, server_default=str(DEFAULT_VAT_RATE))
 
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices_lamm', lazy=True))

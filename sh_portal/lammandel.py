@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
-from .models import Season, BookingsLamm, InvoiceLamm
+from .models import Season, BookingsLamm, InvoiceLamm, VAT_RATES, DEFAULT_VAT_RATE
 from . import db
 import re
 import os
@@ -230,6 +230,13 @@ def send_invoices():
         current_app.logger.error("No season ID provided")
         return jsonify({'error': 'No season selected'}), 400
 
+    try:
+        vat_rate = int(request.json.get('vat_rate', DEFAULT_VAT_RATE))
+    except (TypeError, ValueError):
+        vat_rate = None
+    if vat_rate not in VAT_RATES:
+        return jsonify({'error': f'VAT must be one of {", ".join(str(v) for v in VAT_RATES)}'}), 400
+
     season = db.session.get(Season, season_id)
     if not season:
         current_app.logger.error(f"Season {season_id} not found")
@@ -269,7 +276,8 @@ def send_invoices():
                     date_created=datetime.now(),
                     sent=False,  # Set to False initially
                     quantity=booking.quantity,
-                    tot_sum=booking.total_price(season)
+                    tot_sum=booking.total_price(season),
+                    vat_rate=vat_rate
                 )
                 db.session.add(invoice)
                 # Commit the invoice first
