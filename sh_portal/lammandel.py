@@ -5,7 +5,7 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    format_exception_location, delete_invoice_pdfs, get_effective_mail_backend_with_source,
+    format_exception_location, delete_invoice_pdfs, create_booking_from_form, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
@@ -193,10 +193,7 @@ def update_booking(booking_id):
 
         raw_tiers = request.form.get('andel_tiers')
         if raw_tiers is not None:
-            tiers = [int(t) for t in json.loads(raw_tiers)]
-            allow_tier_2 = booking.season.price_lamm_2 is not None
-            tiers = [2 if (t == 2 and allow_tier_2) else 1 for t in tiers]
-            booking.andel_tiers = json.dumps(tiers)
+            booking.set_andel_tiers(raw_tiers)
 
         delivered_mark = request.form.get('delivered')
         if delivered_mark == '1':
@@ -419,3 +416,25 @@ def delete_invoice(invoice_id):
 
     flash(f'Invoice {number} deleted.', 'success')
     return jsonify({'success': True, 'message': f'Invoice {number} deleted'})
+
+@lammandel.route('/lammandel/api/booking', methods=['POST'])
+def create_booking():
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        booking, error = create_booking_from_form(db, BookingsLamm, request.form)
+        if error:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': error}), 400
+        raw_tiers = request.form.get('andel_tiers')
+        if raw_tiers is not None:
+            booking.set_andel_tiers(raw_tiers)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error creating booking: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    flash('Booking created successfully', 'success')
+    return jsonify({'success': True, 'booking_id': booking.id})

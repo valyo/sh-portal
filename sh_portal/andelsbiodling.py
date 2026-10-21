@@ -7,7 +7,7 @@ import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    format_exception_location, delete_invoice_pdfs, get_effective_mail_backend_with_source,
+    format_exception_location, delete_invoice_pdfs, create_booking_from_form, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
@@ -470,3 +470,22 @@ def delete_invoice(invoice_id):
 
     flash(f'Invoice {number} deleted.', 'success')
     return jsonify({'success': True, 'message': f'Invoice {number} deleted'})
+
+@andelsbiodling.route('/api/booking', methods=['POST'])
+def create_booking():
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        booking, error = create_booking_from_form(db, Bookings, request.form)
+        if error:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': error}), 400
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error creating booking: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    flash('Booking created successfully', 'success')
+    return jsonify({'success': True, 'booking_id': booking.id})

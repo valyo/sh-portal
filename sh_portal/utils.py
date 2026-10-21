@@ -439,6 +439,74 @@ def get_or_create_customer(db, email, name, telephone, address, postnummer, ort)
     return customer
 
 
+def create_booking_from_form(db, BookingsModel, form):
+    """Create a booking (and its customer) from the manual-entry form.
+
+    Returns (booking, None) on success or (None, error_message). The booking is added
+    to the session and flushed but not committed.
+    """
+    from .models import Customer, Season
+
+    try:
+        season = db.session.get(Season, int(form.get('season_id')))
+    except (TypeError, ValueError):
+        season = None
+    if season is None:
+        return None, 'Season not found'
+
+    values = {}
+    for field in ('name', 'email', 'telephone', 'address', 'postnummer', 'ort'):
+        values[field] = (form.get(field) or '').strip()
+        if not values[field]:
+            return None, f'{field} is required'
+
+    try:
+        quantity = int(form.get('quantity'))
+        if quantity < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return None, 'Quantity must be a whole number of at least 1'
+
+    cert_qty_raw = (form.get('certificate_quantity') or '').strip()
+    try:
+        certificate_quantity = int(cert_qty_raw) if cert_qty_raw else None
+        if certificate_quantity is not None and certificate_quantity < 1:
+            raise ValueError
+    except ValueError:
+        return None, 'Certificate quantity must be a whole number of at least 1'
+
+    booking_date_raw = (form.get('booking_date') or '').strip()
+    try:
+        timestamp = datetime.strptime(booking_date_raw, '%Y-%m-%dT%H:%M') if booking_date_raw else datetime.now()
+    except ValueError:
+        return None, 'Booking date is not a valid date and time'
+
+    existing_customer = db.session.query(Customer).filter_by(email=values['email']).first()
+    if existing_customer and BookingsModel.query.filter_by(
+        customer_id=existing_customer.id, season_id=season.id
+    ).first():
+        return None, f"A booking for {values['email']} already exists in season {season.year}; edit that booking instead"
+
+    customer = get_or_create_customer(db, **values)
+    db.session.flush()
+
+    now = datetime.now()
+    booking = BookingsModel(
+        season_id=season.id,
+        customer_id=customer.id,
+        timestamp=timestamp,
+        message=form.get('message') or '',
+        quantity=quantity,
+        certificate_name=(form.get('certificate_name') or '').strip() or None,
+        certificate_quantity=certificate_quantity,
+        certificate_sent_at=now if form.get('certificate_sent') == '1' else None,
+        delivered_at=now if form.get('delivered') == '1' else None,
+    )
+    db.session.add(booking)
+    db.session.flush()
+    return booking, None
+
+
 def _parse_booking_timestamp(s):
     """
     Parse a timestamp string from Google Sheets (or similar) into a datetime.

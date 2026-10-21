@@ -157,6 +157,12 @@ class BookingsLamm(db.Model):
         tiers = [t if t in (1, 2) else 1 for t in tiers][:self.quantity]
         return tiers + [1] * (self.quantity - len(tiers))
 
+    def set_andel_tiers(self, raw_json):
+        """Store per-andel price tiers from a JSON list; tier 2 is only allowed if the season has a second price."""
+        allow_tier_2 = self.season.price_lamm_2 is not None
+        tiers = [2 if (int(t) == 2 and allow_tier_2) else 1 for t in json.loads(raw_json)]
+        self.andel_tiers = json.dumps(tiers)
+
     def andel_prices(self, season=None):
         """Unit price for each andel, resolved from the season's two Lammandel prices."""
         season = season or self.season
