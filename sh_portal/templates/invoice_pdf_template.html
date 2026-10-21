@@ -250,6 +250,17 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% if 'LAMM' in invoice.invoice_id %}
+                    {% for item in invoice.line_items %}
+                    <tr>
+                        <td>Lammandel</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ "%.2f"|format(item.unit_price) }} kr</td>
+                        <td>12%</td>
+                        <td>{{ "%.2f"|format(item.total) }} kr</td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
                     <tr>
                         <td>{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andel av honungsskörden ' ~ invoice.season.year if invoice.season else '' }}</td>
                         <td>{{ invoice.quantity }}</td>
@@ -257,6 +268,7 @@
                         <td>12%</td>
                         <td>{{ "%.2f"|format(invoice.tot_sum) }} kr</td>
                     </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>

@@ -89,6 +89,17 @@
                         </tr>
                     </thead>
                     <tbody>
+                        {% if 'LAMM' in invoice.invoice_id %}
+                        {% for item in invoice.line_items %}
+                        <tr>
+                            <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">Lammandel</td>
+                            <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">{{ item.quantity }}</td>
+                            <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">{{ "%.2f"|format(item.unit_price) }} kr</td>
+                            <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">12%</td>
+                            <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">{{ "%.2f"|format(item.total) }} kr</td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
                         <tr>
                             <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">{{ 'Lammandel' if 'LAMM' in invoice.invoice_id else 'Andel av honungsskörden ' ~ invoice.season.year if invoice.season else '' }}</td>
                             <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">{{ invoice.quantity }}</td>
@@ -96,6 +107,7 @@
                             <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">12%</td>
                             <td style="padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #eee;">{{ "%.2f"|format(invoice.tot_sum) }} kr</td>
                         </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </td>

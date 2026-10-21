@@ -32,7 +32,7 @@
                                     <td>{{ season.year }}</td>
                                     <td>{{ season.price | int }}</td>
                                     <td>{{ season.kg_honey if season.kg_honey is not none else '-' }}</td>
-                                    <td>{{ season.price_lamm | int }}</td>
+                                    <td>{{ season.price_lamm | int }}{% if season.price_lamm_2 is not none %} / {{ season.price_lamm_2 | int }}{% endif %}</td>
                                     <td>
                                         <span class="badge bg-success">Active</span>
                                     </td>
@@ -98,8 +98,12 @@
                             <div class="card-body">
                                 <h6 class="card-title fw-bold">Lammandel (Lamb)</h6>
                                 <div class="mb-3">
-                                    <label for="price_lamm" class="form-label">Price</label>
+                                    <label for="price_lamm" class="form-label">Price 1</label>
                                     <input type="number" step="1" class="form-control" id="price_lamm" name="price_lamm" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="price_lamm_2" class="form-label">Price 2 (optional)</label>
+                                    <input type="number" step="1" class="form-control" id="price_lamm_2" name="price_lamm_2">
                                 </div>
                                 <div class="mb-3">
                                     <label for="google_sheets_link_lamm" class="form-label">Google Sheets Link</label>
@@ -163,8 +167,12 @@
                             <div class="card-body">
                                 <h6 class="card-title fw-bold">Lammandel (Lamb)</h6>
                                 <div class="mb-3">
-                                    <label for="manage_price_lamm" class="form-label">Price</label>
+                                    <label for="manage_price_lamm" class="form-label">Price 1</label>
                                     <input type="number" step="1" class="form-control" id="manage_price_lamm" name="price_lamm" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="manage_price_lamm_2" class="form-label">Price 2 (optional)</label>
+                                    <input type="number" step="1" class="form-control" id="manage_price_lamm_2" name="price_lamm_2">
                                 </div>
                                 <div class="mb-3">
                                     <label for="manage_google_sheets_link_lamm" class="form-label">Google Sheets Link</label>
@@ -257,6 +265,7 @@
                         document.getElementById('manage_price').value = data.price;
                         document.getElementById('manage_kg_honey').value = data.kg_honey !== null ? data.kg_honey : '';
                         document.getElementById('manage_price_lamm').value = data.price_lamm;
+                        document.getElementById('manage_price_lamm_2').value = data.price_lamm_2 !== null ? data.price_lamm_2 : '';
                         document.getElementById('manage_google_sheets_link_honey').value = data.google_sheets_link_honey || '';
                         document.getElementById('manage_sheet_range_honey').value = data.sheet_range_honey || 'Form Responses 1';
                         document.getElementById('manage_google_sheets_link_lamm').value = data.google_sheets_link_lamm || '';
