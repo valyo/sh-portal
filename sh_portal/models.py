@@ -5,19 +5,22 @@ from sqlalchemy.sql import func
 
 
 VAT_RATES = (6, 12)
-DEFAULT_VAT_RATE = 12
 
 
 class VatMixin:
-    """Invoice totals are VAT-inclusive; derive net and VAT amounts from vat_rate."""
+    """Invoice totals are VAT-inclusive; derive net and VAT amounts from vat_rate.
+
+    Both are rounded to whole öre, and the VAT is total minus net, so net + VAT always
+    equals the total exactly as printed.
+    """
 
     @property
     def vat_net(self):
-        return self.tot_sum / (1 + self.vat_rate / 100)
+        return round(self.tot_sum / (1 + self.vat_rate / 100), 2)
 
     @property
     def vat_amount(self):
-        return self.tot_sum - self.vat_net
+        return round(self.tot_sum - self.vat_net, 2)
 
 
 class Season(db.Model):
@@ -188,7 +191,7 @@ class Invoice(VatMixin, db.Model):
     date_payed = db.Column(db.DateTime, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
-    vat_rate = db.Column(db.Integer, nullable=False, default=DEFAULT_VAT_RATE, server_default=str(DEFAULT_VAT_RATE))
+    vat_rate = db.Column(db.Integer, nullable=False)  # always chosen explicitly when invoicing
 
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices', lazy=True))
@@ -270,7 +273,7 @@ class InvoiceLamm(VatMixin, db.Model):
     date_payed = db.Column(db.DateTime, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     tot_sum = db.Column(db.Float, nullable=False)
-    vat_rate = db.Column(db.Integer, nullable=False, default=DEFAULT_VAT_RATE, server_default=str(DEFAULT_VAT_RATE))
+    vat_rate = db.Column(db.Integer, nullable=False)  # always chosen explicitly when invoicing
 
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices_lamm', lazy=True))

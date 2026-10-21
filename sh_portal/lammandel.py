@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
-from .models import Season, BookingsLamm, InvoiceLamm, VAT_RATES
+from .models import Season, BookingsLamm, InvoiceLamm
 from . import db
 import re
 import os
 from .utils import (
     import_bookings_from_sheet, generate_invoice_pdf, get_sheet_data, extract_sheet_id,
-    format_exception_location, delete_invoice_pdfs, invoice_pdf_path, create_booking_from_form, get_effective_mail_backend_with_source,
+    format_exception_location, delete_invoice_pdfs, invoice_pdf_path, create_booking_from_form, parse_quantity, parse_vat_rate, get_effective_mail_backend_with_source,
     get_mail_connection_params, send_mail_using_current_config,
     write_certificate_pdf_to_disk, certificate_download_filename, send_booking_certificate_email,
 )
@@ -179,10 +179,10 @@ def update_booking(booking_id):
         booking.customer.postnummer = request.form.get('postnummer')
         booking.customer.ort = request.form.get('ort')
         booking.message = request.form.get('message')
-        booking.quantity = int(request.form.get('quantity'))
+        booking.quantity = parse_quantity(request.form.get('quantity'))
         booking.certificate_name = request.form.get('certificate_name')
-        cert_qty = request.form.get('certificate_quantity')
-        booking.certificate_quantity = int(cert_qty) if cert_qty else None
+        cert_qty = (request.form.get('certificate_quantity') or '').strip()
+        booking.certificate_quantity = parse_quantity(cert_qty, 'Certificate quantity') if cert_qty else None
 
         cert_mark = request.form.get('certificate_sent')
         if cert_mark == '1':
@@ -227,12 +227,9 @@ def send_invoices():
         current_app.logger.error("No season ID provided")
         return jsonify({'error': 'No season selected'}), 400
 
-    try:
-        vat_rate = int(request.json.get('vat_rate'))
-    except (TypeError, ValueError):
-        vat_rate = None
-    if vat_rate not in VAT_RATES:
-        return jsonify({'error': f'Please select a VAT rate ({" or ".join(str(v) for v in VAT_RATES)})'}), 400
+    vat_rate, vat_error = parse_vat_rate(request.json)
+    if vat_error:
+        return jsonify({'error': vat_error}), 400
 
     season = db.session.get(Season, season_id)
     if not season:
@@ -428,7 +425,7 @@ def create_booking():
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        booking, error = create_booking_from_form(db, BookingsLamm, request.form)
+        booking, error, notes = create_booking_from_form(db, BookingsLamm, request.form)
         if error:
             db.session.rollback()
             return jsonify({'success': False, 'message': error}), 400
@@ -442,4 +439,6 @@ def create_booking():
         return jsonify({'success': False, 'message': str(e)}), 400
 
     flash('Booking created successfully', 'success')
-    return jsonify({'success': True, 'booking_id': booking.id})
+    for note in notes:
+        flash(note, 'info')
+    return jsonify({'success': True, 'booking_id': booking.id, 'notes': notes})

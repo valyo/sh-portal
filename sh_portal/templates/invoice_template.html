@@ -133,7 +133,7 @@
                             </table>
                         </td>
                         <td style="vertical-align: top; text-align: right; font-size: 15px;">
-                            <p style="margin: 0 0 6px 0;"><span style="color: #3d1f1c;">Belopp före moms:</span> <strong>{{ "%.3f"|format(invoice.vat_net) }} kr</strong></p>
+                            <p style="margin: 0 0 6px 0;"><span style="color: #3d1f1c;">Belopp före moms:</span> <strong>{{ "%.2f"|format(invoice.vat_net) }} kr</strong></p>
                             <p style="margin: 0 0 6px 0;"><span style="color: #3d1f1c;">Total moms ({{ invoice.vat_rate }}%):</span> <strong>{{ "%.2f"|format(invoice.vat_amount) }} kr</strong></p>
                             <p style="margin: 14px 0 0 0; padding-top: 10px; border-top: 2px solid #bbb; font-size: 17px; font-weight: bold; color: #6d2e1c;">Summa att betala: {{ "%.2f"|format(invoice.tot_sum) }} kr</p>
                         </td>

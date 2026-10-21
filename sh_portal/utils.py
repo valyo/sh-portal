@@ -1,5 +1,6 @@
 from datetime import datetime
 from flask import current_app, flash
+from sqlalchemy import func
 import pandas as pd
 import os
 import re
@@ -9,6 +10,9 @@ from googleapiclient.discovery import build
 from weasyprint import HTML
 from jinja2 import Template
 from io import BytesIO
+
+# Upper bound for andelar per booking (also bounds the per-andel price lists built from it)
+MAX_QUANTITY = 200
 
 
 def normalize_customer_name(s):
@@ -418,13 +422,50 @@ def generate_invoice_pdf(html_content, output_path):
         return False
 
 
+def booking_exists_for_email(BookingsModel, season_id, email):
+    """True if any customer row with this email (case-insensitive) already has a booking in the season."""
+    from .models import Customer
+    return BookingsModel.query.join(Customer, BookingsModel.customer_id == Customer.id).filter(
+        BookingsModel.season_id == season_id,
+        func.lower(Customer.email) == email.strip().lower(),
+    ).first() is not None
+
+
+def parse_quantity(raw, label='Quantity'):
+    """Return raw as a whole number between 1 and MAX_QUANTITY, else raise ValueError with a user-facing message."""
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f'{label} must be a whole number')
+    if not 1 <= value <= MAX_QUANTITY:
+        raise ValueError(f'{label} must be between 1 and {MAX_QUANTITY}')
+    return value
+
+
+def parse_vat_rate(payload):
+    """Return (vat_rate, None) from a JSON payload, or (None, error_message) if it is not one of VAT_RATES."""
+    from .models import VAT_RATES
+    try:
+        rate = int((payload or {}).get('vat_rate'))
+    except (TypeError, ValueError):
+        rate = None
+    if rate not in VAT_RATES:
+        return None, f'Please select a VAT rate ({" or ".join(str(v) for v in VAT_RATES)})'
+    return rate, None
+
+
 def get_or_create_customer(db, email, name, telephone, address, postnummer, ort):
     """
     Return a Customer for the given contact data. If a customer with this email exists,
     update their fields and return it; otherwise create and return a new one.
     """
     from .models import Customer
-    customer = db.session.query(Customer).filter_by(email=email).first()
+    customer = (
+        db.session.query(Customer)
+        .filter(func.lower(Customer.email) == email.strip().lower())
+        .order_by(Customer.id)
+        .first()
+    )
     if customer:
         customer.name = name
         customer.telephone = telephone
@@ -447,8 +488,9 @@ def get_or_create_customer(db, email, name, telephone, address, postnummer, ort)
 def create_booking_from_form(db, BookingsModel, form):
     """Create a booking (and its customer) from the manual-entry form.
 
-    Returns (booking, None) on success or (None, error_message). The booking is added
-    to the session and flushed but not committed.
+    Returns (booking, None, notes) on success or (None, error_message, []). `notes` lists
+    things the user should know about (e.g. an existing customer's details were updated).
+    The booking is added to the session and flushed but not committed.
     """
     from .models import Customer, Season
 
@@ -457,45 +499,50 @@ def create_booking_from_form(db, BookingsModel, form):
     except (TypeError, ValueError):
         season = None
     if season is None:
-        return None, 'Season not found'
+        return None, 'Season not found', []
 
     values = {}
     for field in ('name', 'email', 'telephone', 'address', 'postnummer', 'ort'):
         values[field] = (form.get(field) or '').strip()
         if not values[field]:
-            return None, f'{field} is required'
+            return None, f'{field} is required', []
 
     try:
-        quantity = int(form.get('quantity'))
-        if quantity < 1:
-            raise ValueError
-    except (TypeError, ValueError):
-        return None, 'Quantity must be a whole number of at least 1'
-
-    cert_qty_raw = (form.get('certificate_quantity') or '').strip()
-    try:
-        certificate_quantity = int(cert_qty_raw) if cert_qty_raw else None
-        if certificate_quantity is not None and certificate_quantity < 1:
-            raise ValueError
-    except ValueError:
-        return None, 'Certificate quantity must be a whole number of at least 1'
+        quantity = parse_quantity(form.get('quantity'))
+        cert_qty_raw = (form.get('certificate_quantity') or '').strip()
+        certificate_quantity = parse_quantity(cert_qty_raw, 'Certificate quantity') if cert_qty_raw else None
+    except ValueError as e:
+        return None, str(e), []
 
     booking_date_raw = (form.get('booking_date') or '').strip()
     try:
         timestamp = datetime.strptime(booking_date_raw, '%Y-%m-%dT%H:%M') if booking_date_raw else datetime.now()
     except ValueError:
-        return None, 'Booking date is not a valid date and time'
+        return None, 'Booking date is not a valid date and time', []
 
-    existing_customer = db.session.query(Customer).filter_by(email=values['email']).first()
-    if existing_customer and BookingsModel.query.filter_by(
-        customer_id=existing_customer.id, season_id=season.id
-    ).first():
-        return None, f"A booking for {values['email']} already exists in season {season.year}; edit that booking instead"
+    existing_customers = (
+        db.session.query(Customer)
+        .filter(func.lower(Customer.email) == values['email'].lower())
+        .order_by(Customer.id)
+        .all()
+    )
+    if booking_exists_for_email(BookingsModel, season.id, values['email']):
+        return None, f"A booking for {values['email']} already exists in season {season.year}; edit that booking instead", []
+
+    notes = []
+    if existing_customers:
+        existing = existing_customers[0]
+        changed = [f for f in ('name', 'telephone', 'address', 'postnummer', 'ort') if getattr(existing, f) != values[f]]
+        if changed:
+            notes.append(
+                f"Contact details of the existing customer {existing.email} were updated ({', '.join(changed)}); "
+                "this also applies to their other bookings."
+            )
 
     customer = get_or_create_customer(db, **values)
     db.session.flush()
 
-    now = datetime.now()
+    now = datetime.utcnow()
     booking = BookingsModel(
         season_id=season.id,
         customer_id=customer.id,
@@ -509,7 +556,7 @@ def create_booking_from_form(db, BookingsModel, form):
     )
     db.session.add(booking)
     db.session.flush()
-    return booking, None
+    return booking, None, notes
 
 
 def _parse_booking_timestamp(s):
@@ -632,6 +679,10 @@ def import_bookings_from_sheet(
             quantity = 1
         if quantity < 1:
             quantity = 1
+        if quantity > MAX_QUANTITY:
+            current_app.logger.error(f"Quantity {quantity} is above {MAX_QUANTITY}: {row['email']!r}")
+            flash(f'Quantity {quantity} for {row["email"]} is above the maximum of {MAX_QUANTITY}; booking skipped.', 'error')
+            continue
 
         current_app.logger.info(f"Timestamp: {timestamp_obj}")
 
@@ -644,12 +695,7 @@ def import_bookings_from_sheet(
             postnummer=row['postnummer'],
             ort=row['ort'],
         )
-        existing_booking = BookingsModel.query.filter_by(
-            customer_id=customer.id,
-            season_id=season_id
-        ).first()
-
-        if not existing_booking:
+        if not booking_exists_for_email(BookingsModel, season_id, row['email']):
             booking = BookingsModel(
                 season_id=season_id,
                 customer_id=customer.id,
