@@ -299,6 +299,7 @@
             <form id="manageBookingForm" method="POST">
                 <div class="modal-body">
                     <input type="hidden" id="bookingId" name="booking_id">
+                    <input type="hidden" id="bookingCustomerId" name="customer_id" value="">
                     <div class="mb-3 d-none" id="customerPickerGroup">
                         <label for="customerPicker" class="form-label">Existing customer (optional)</label>
                         <input type="text" class="form-control" id="customerPicker" list="customerOptions"
@@ -743,6 +744,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadCustomerPicker() {
         customersByLabel = {};
         pickedCustomer = null;
+        document.getElementById('bookingCustomerId').value = '';
         customerOptions.innerHTML = '';
         setPickerHint(CUSTOMER_PICKER_DEFAULT_HINT, false);
         const kind = document.querySelector('h1').textContent.trim() === 'Lammandel' ? 'lammandel' : 'andelsbiodling';
@@ -751,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(customers => {
                 customers.forEach(c => {
-                    let label = `${c.name} \u2014 ${c.email}`;
+                    let label = c.email ? `${c.name} \u2014 ${c.email}` : `${c.name} (no email yet)`;
                     if (customersByLabel[label]) label += ` #${c.id}`;
                     customersByLabel[label] = c;
                     const option = document.createElement('option');
@@ -770,19 +772,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const customer = customersByLabel[typed];
         if (customer) {
             pickedCustomer = customer;
+            document.getElementById('bookingCustomerId').value = customer.id;
             CONTACT_FIELDS.forEach(f => { document.getElementById(f).value = customer[f] || ''; });
             const season = document.querySelector('#season_id option:checked').textContent.trim();
             if (customer.booked) {
                 setPickerHint(`${customer.name} already has a booking in ${season}. Edit that booking instead; creating another will be rejected.`, true);
             } else {
-                setPickerHint('Details filled in from the customer record. Changing them here also updates the customer.', false);
+                const missing = CONTACT_FIELDS.filter(f => !customer[f]);
+                setPickerHint(missing.length
+                    ? `Details filled in from the customer record. A booking also needs: ${missing.join(', ')}. They are saved on the customer.`
+                    : 'Details filled in from the customer record. Changing them here also updates the customer.', false);
             }
         } else if (typed === '' && pickedCustomer) {
             pickedCustomer = null;
+            document.getElementById('bookingCustomerId').value = '';
             CONTACT_FIELDS.forEach(f => { document.getElementById(f).value = ''; });
             setPickerHint(CUSTOMER_PICKER_DEFAULT_HINT, false);
         } else if (pickedCustomer) {
             pickedCustomer = null;
+            document.getElementById('bookingCustomerId').value = '';
             setPickerHint(CUSTOMER_PICKER_DEFAULT_HINT, false);
         }
     }

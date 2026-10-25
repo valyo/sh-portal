@@ -7,6 +7,9 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1>Customers</h1>
+                <button type="button" class="btn btn-primary" id="newCustomerBtn">
+                    <i class="bi bi-plus-lg"></i> New customer
+                </button>
             </div>
 
             <div class="card">
@@ -22,6 +25,7 @@
                                     <th>Postnummer</th>
                                     <th>Ort</th>
                                     <th>Bookings</th>
+                                    <th>Sales</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -30,10 +34,10 @@
                                 <tr>
                                     <td>{{ customer.id }}</td>
                                     <td>{{ customer.name }}</td>
-                                    <td><a href="mailto:{{ customer.email }}">{{ customer.email }}</a></td>
-                                    <td>{{ customer.address }}</td>
-                                    <td>{{ customer.postnummer }}</td>
-                                    <td>{{ customer.ort }}</td>
+                                    <td>{% if customer.email %}<a href="mailto:{{ customer.email }}">{{ customer.email }}</a>{% else %}<span class="text-muted">&mdash;</span>{% endif %}</td>
+                                    <td>{{ customer.address or '' }}</td>
+                                    <td>{{ customer.postnummer or '' }}</td>
+                                    <td>{{ customer.ort or '' }}</td>
                                     <td>
                                         {% set honey_count = customer.bookings|length %}
                                         {% set lamb_count = customer.bookings_lamm|length %}
@@ -45,6 +49,10 @@
                                         {% endif %}
                                     </td>
                                     <td>
+                                        {% set sales_count = customer.sales|length %}
+                                        {% if sales_count %}<span class="badge bg-success">Sales: {{ sales_count }}</span>{% else %}<span class="text-muted">&mdash;</span>{% endif %}
+                                    </td>
+                                    <td>
                                         <button type="button" class="btn btn-sm btn-outline-secondary manage-customer"
                                                 data-customer-id="{{ customer.id }}">
                                             <i class="bi bi-gear"></i> Manage
@@ -53,7 +61,7 @@
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="8" class="text-muted text-center py-4">No customers yet.</td>
+                                    <td colspan="9" class="text-muted text-center py-4">No customers yet.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -77,12 +85,12 @@
                         <input type="hidden" id="customerId" name="customer_id">
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="customerName" class="form-label">Name</label>
+                                <label for="customerName" class="form-label">Name <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="customerName" name="name" required>
                             </div>
                             <div class="col-md-6">
                                 <label for="customerEmail" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="customerEmail" name="email" required>
+                                <input type="email" class="form-control" id="customerEmail" name="email">
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -105,7 +113,8 @@
                                 <input type="text" class="form-control" id="customerOrt" name="ort">
                             </div>
                         </div>
-                        <div class="mb-3">
+                        <div class="form-text mb-3">Only the name is required. Customers with bookings also need their email and address details, because invoices and certificates use them.</div>
+                        <div class="mb-3" id="customerBookingsGroup">
                             <label class="form-label fw-bold">Bookings by season</label>
                             <div id="customerBookingsList" class="border rounded p-2 bg-light small">
                                 <span class="text-muted">Loading…</span>
@@ -114,6 +123,9 @@
                         </div>
                     </div>
                     <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-danger me-auto" id="deleteCustomerBtn">
+                            <i class="bi bi-trash"></i> Delete customer
+                        </button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
@@ -146,8 +158,27 @@ document.addEventListener('DOMContentLoaded', function() {
         bookingsListEl.innerHTML = lines.join('<br>');
     }
 
+    let customerModalMode = 'edit';
+    function setCustomerModalMode(mode) {
+        customerModalMode = mode;
+        const creating = mode === 'create';
+        document.getElementById('manageCustomerModalLabel').textContent = creating ? 'New Customer' : 'Manage Customer';
+        document.getElementById('customerBookingsGroup').classList.toggle('d-none', creating);
+        document.getElementById('deleteCustomerBtn').classList.toggle('d-none', creating);
+    }
+
+    const newCustomerBtn = document.getElementById('newCustomerBtn');
+    if (newCustomerBtn) newCustomerBtn.addEventListener('click', function() {
+        manageCustomerForm.reset();
+        setCustomerModalMode('create');
+        document.getElementById('customerId').value = '';
+        if (manageCustomerModal) manageCustomerModal.show();
+        document.getElementById('customerName').focus();
+    });
+
     document.querySelectorAll('.manage-customer').forEach(function(btn) {
         btn.addEventListener('click', function() {
+            setCustomerModalMode('edit');
             const customerId = this.dataset.customerId;
             document.getElementById('customerId').value = customerId;
             bookingsListEl.innerHTML = '<span class="text-muted">Loading…</span>';
@@ -162,6 +193,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('customerPostnummer').value = data.postnummer || '';
                     document.getElementById('customerOrt').value = data.ort || '';
                     renderBookings(data.bookings);
+                    const deleteBtn = document.getElementById('deleteCustomerBtn');
+                    const hasBookings = (data.bookings || []).length > 0;
+                    deleteBtn.disabled = hasBookings;
+                    deleteBtn.title = hasBookings ? 'This customer has bookings, so it cannot be deleted' : '';
+                    deleteBtn.dataset.name = data.name || '';
+                    deleteBtn.dataset.sales = data.sales_count || 0;
                     if (manageCustomerModal) manageCustomerModal.show();
                 })
                 .catch(function(err) {
@@ -169,6 +206,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     bookingsListEl.innerHTML = '<span class="text-danger">Error loading customer.</span>';
                 });
         });
+    });
+
+    document.getElementById('deleteCustomerBtn').addEventListener('click', function() {
+        const customerId = document.getElementById('customerId').value;
+        const name = this.dataset.name;
+        const sales = parseInt(this.dataset.sales, 10) || 0;
+        let question = 'Delete the customer ' + name + '?';
+        if (sales > 0) {
+            question += '\n\n' + sales + (sales === 1 ? ' sale stays' : ' sales stay') + ' in the sales list with the name "' + name + '" but ' +
+                (sales === 1 ? 'is' : 'are') + ' no longer linked to a customer.';
+        }
+        question += '\n\nThis cannot be undone.';
+        if (!confirm(question)) return;
+
+        fetch('/api/customer/' + customerId + '/delete', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (manageCustomerModal) manageCustomerModal.hide();
+                    window.location.reload();
+                } else {
+                    alert('Error deleting customer: ' + (data.message || data.error || 'Unknown error'));
+                }
+            })
+            .catch(function(err) {
+                console.error('Error deleting customer:', err);
+                alert('Error deleting customer.');
+            });
     });
 
     if (manageCustomerForm) {
@@ -183,7 +248,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.set('postnummer', document.getElementById('customerPostnummer').value);
             formData.set('ort', document.getElementById('customerOrt').value);
 
-            fetch('/api/customer/' + customerId, {
+            const creating = customerModalMode === 'create';
+            fetch(creating ? '/api/customer' : '/api/customer/' + customerId, {
                 method: 'POST',
                 body: formData
             })
@@ -193,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (manageCustomerModal) manageCustomerModal.hide();
                     window.location.reload();
                 } else {
-                    alert('Error updating customer: ' + (data.message || 'Unknown error'));
+                    alert((creating ? 'Error creating customer: ' : 'Error updating customer: ') + (data.message || 'Unknown error'));
                 }
             })
             .catch(function(err) {

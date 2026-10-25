@@ -220,7 +220,7 @@
                     <h5 class="modal-title" id="saleCreateModalLabel">New sale</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="post" action="{{ url_for('sales.create_sale') }}">
+                <form method="post" action="{{ url_for('sales.create_sale') }}" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -276,11 +276,11 @@
                             </div>
                             <div class="col-12">
                                 <label for="sale_customer_name" class="form-label">Customer</label>
-                                <input type="text" class="form-control" id="sale_customer_name" name="customer_name" placeholder="Type to search existing customers or enter a new name" maxlength="200" autocomplete="off">
+                                <input type="text" class="form-control" id="sale_customer_name" name="customer_name" placeholder="Type to search existing customers or enter a new name" maxlength="150" autocomplete="off">
                                 <div id="sale_customer_suggestions" class="list-group border shadow-sm d-none" style="position: fixed; z-index: 1060; max-height: 220px; overflow-y: auto; min-width: 200px;"></div>
                                 <input type="hidden" id="sale_customer_id" name="customer_id" value="">
-                                <small class="text-muted">Start typing to pick an existing customer (avoids typos). Or type a new name for one-off sales.</small>
-                                <div id="sale_customer_normalized_hint" class="small text-success mt-1 d-none"></div>
+                                <small class="text-muted">Start typing to pick an existing customer (avoids typos). Or type a new name: it is saved as a new customer (only the name is needed; add contact details later on the Customers page).</small>
+                                <div id="sale_customer_normalized_hint" class="small text-success mt-1 invisible" style="min-height: 1.5em;"></div>
                             </div>
                         </div>
                     </div>
@@ -301,7 +301,7 @@
                     <h5 class="modal-title" id="saleEditModalLabel">Edit sale</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="saleEditForm" method="post" action="">
+                <form id="saleEditForm" method="post" action="" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -354,7 +354,7 @@
                             </div>
                             <div class="col-12">
                                 <label for="edit_sale_customer_name" class="form-label">Customer</label>
-                                <input type="text" class="form-control" id="edit_sale_customer_name" name="customer_name" placeholder="Type to search or enter name" maxlength="200" autocomplete="off">
+                                <input type="text" class="form-control" id="edit_sale_customer_name" name="customer_name" placeholder="Type to search or enter name" maxlength="150" autocomplete="off">
                                 <div id="edit_sale_customer_suggestions" class="list-group border shadow-sm d-none" style="position: fixed; z-index: 1060; max-height: 220px; overflow-y: auto; min-width: 200px;"></div>
                                 <input type="hidden" id="edit_sale_customer_id" name="customer_id" value="">
                                 <div id="edit_sale_customer_normalized_hint" class="small text-success mt-1 d-none"></div>
@@ -379,7 +379,7 @@
     (function() {
         var customersRaw = {{ customers_json|safe }};
         var customers = customersRaw.map(function(c) {
-            return { id: c.id, name: c.name, email: c.email, search: (c.name + ' ' + c.email).toLowerCase() };
+            return { id: c.id, name: c.name, email: c.email, search: (c.name + ' ' + (c.email || '')).toLowerCase() };
         });
 
         document.getElementById('saleCreateModal').addEventListener('show.bs.modal', function () {
@@ -392,7 +392,7 @@
             document.getElementById('sale_customer_id').value = '';
             document.getElementById('sale_customer_suggestions').classList.add('d-none');
             var h = document.getElementById('sale_customer_normalized_hint');
-            if (h) { h.classList.add('d-none'); h.textContent = ''; }
+            if (h) { h.classList.add('invisible'); h.textContent = ''; }
             currentMatches = [];
             highlightedIndex = -1;
         });
@@ -442,7 +442,7 @@
                 var a = document.createElement('a');
                 a.href = '#';
                 a.className = 'list-group-item list-group-item-action' + (i === 0 ? ' active' : '');
-                a.textContent = c.name + ' (' + c.email + ')';
+                a.textContent = c.name + (c.email ? ' (' + c.email + ')' : '');
                 a.dataset.id = c.id;
                 a.dataset.name = c.name;
                 a.dataset.index = i;
@@ -470,22 +470,22 @@
             var hintEl = document.getElementById('sale_customer_normalized_hint');
             if (!hintEl) return;
             if (idEl.value) {
-                hintEl.classList.add('d-none');
+                hintEl.classList.add('invisible');
                 hintEl.textContent = '';
                 return;
             }
             var raw = (nameEl.value || '').trim();
             if (!raw) {
-                hintEl.classList.add('d-none');
+                hintEl.classList.add('invisible');
                 hintEl.textContent = '';
                 return;
             }
             var normalized = normalizeNameForDisplay(raw);
             if (normalized) {
-                hintEl.textContent = 'Will be saved as: ' + normalized;
-                hintEl.classList.remove('d-none');
+                hintEl.textContent = 'Will be saved as a new customer: ' + normalized;
+                hintEl.classList.remove('invisible');
             } else {
-                hintEl.classList.add('d-none');
+                hintEl.classList.add('invisible');
             }
         }
 
@@ -605,7 +605,7 @@
                     var a = document.createElement('a');
                     a.href = '#';
                     a.className = 'list-group-item list-group-item-action';
-                    a.textContent = c.name + ' (' + c.email + ')';
+                    a.textContent = c.name + (c.email ? ' (' + c.email + ')' : '');
                     a.addEventListener('mousedown', function(ev) {
                         ev.preventDefault();
                         ev.stopPropagation();

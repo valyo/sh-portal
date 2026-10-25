@@ -454,6 +454,67 @@ def parse_vat_rate(payload):
     return rate, None
 
 
+CUSTOMER_DETAIL_FIELDS = ('email', 'telephone', 'address', 'postnummer', 'ort')
+CUSTOMER_NAME_MAX = 150
+
+
+def clean_optional(value):
+    """Stripped string, or None for None / empty / whitespace-only input."""
+    if value is None:
+        return None
+    value = str(value).strip()
+    return value or None
+
+
+def customers_named(db, name):
+    """All customers whose name equals `name`, ignoring case and surrounding spaces, oldest first."""
+    from .models import Customer
+    return (
+        db.session.query(Customer)
+        .filter(func.lower(Customer.name) == name.strip().lower())
+        .order_by(Customer.id)
+        .all()
+    )
+
+
+def resolve_sale_customer(db, customer_id, raw_name):
+    """Turn what the sale form sent into a Customer record.
+
+    - A picked customer (customer_id) is used as is.
+    - Otherwise a typed name is normalized; an existing customer with exactly that name is
+      reused, no match creates a new name-only customer (contact details can be added later
+      on the Customers page), and several matches are an error so the user picks the right one.
+    - Neither a customer nor a name means the sale has no customer.
+
+    Returns (customer_or_None, error_or_None, note_or_None). A new customer is added to the
+    session and flushed, not committed.
+    """
+    from .models import Customer
+
+    if customer_id:
+        customer = db.session.get(Customer, customer_id)
+        if customer is None:
+            return None, 'The selected customer no longer exists.', None
+        return customer, None, None
+
+    name = normalize_customer_name(raw_name)
+    if not name:
+        return None, None, None
+    if len(name) > CUSTOMER_NAME_MAX:
+        return None, f'The customer name is too long (at most {CUSTOMER_NAME_MAX} characters).', None
+
+    matches = customers_named(db, name)
+    if len(matches) == 1:
+        return matches[0], None, f'Used the existing customer {matches[0].name}.'
+    if len(matches) > 1:
+        return None, f'There are several customers named {name}; pick the right one from the list.', None
+
+    customer = Customer(name=name)
+    db.session.add(customer)
+    db.session.flush()
+    return customer, None, f'Created the new customer {name}.'
+
+
 def get_or_create_customer(db, email, name, telephone, address, postnummer, ort):
     """
     Return a Customer for the given contact data. If a customer with this email exists,
@@ -520,26 +581,55 @@ def create_booking_from_form(db, BookingsModel, form):
     except ValueError:
         return None, 'Booking date is not a valid date and time', []
 
+    # A customer picked in the form (customer_id) is completed and used as is; otherwise the
+    # customer is found, or created, by email.
+    picked = None
+    picked_raw = (form.get('customer_id') or '').strip()
+    if picked_raw:
+        try:
+            picked = db.session.get(Customer, int(picked_raw))
+        except ValueError:
+            picked = None
+        if picked is None:
+            return None, 'The selected customer no longer exists', []
+        clash = (
+            db.session.query(Customer)
+            .filter(func.lower(Customer.email) == values['email'].lower(), Customer.id != picked.id)
+            .first()
+        )
+        if clash:
+            return None, f"{clash.name} already uses the email {values['email']}; pick that customer instead", []
+
     existing_customers = (
         db.session.query(Customer)
         .filter(func.lower(Customer.email) == values['email'].lower())
         .order_by(Customer.id)
         .all()
     )
-    if booking_exists_for_email(BookingsModel, season.id, values['email']):
+    already_booked = booking_exists_for_email(BookingsModel, season.id, values['email']) or (
+        picked is not None
+        and BookingsModel.query.filter_by(season_id=season.id, customer_id=picked.id).first() is not None
+    )
+    if already_booked:
         return None, f"A booking for {values['email']} already exists in season {season.year}; edit that booking instead", []
 
     notes = []
-    if existing_customers:
-        existing = existing_customers[0]
-        changed = [f for f in ('name', 'telephone', 'address', 'postnummer', 'ort') if getattr(existing, f) != values[f]]
+    existing = picked or (existing_customers[0] if existing_customers else None)
+    if existing:
+        compared = ('name', 'email', 'telephone', 'address', 'postnummer', 'ort') if picked else ('name', 'telephone', 'address', 'postnummer', 'ort')
+        changed = [f for f in compared if (getattr(existing, f) or '') != values[f]]
         if changed:
             notes.append(
-                f"Contact details of the existing customer {existing.email} were updated ({', '.join(changed)}); "
-                "this also applies to their other bookings."
+                f"Contact details of the existing customer {existing.email or values['email']} were updated "
+                f"({', '.join(changed)}); this also applies to their other bookings and sales."
             )
 
-    customer = get_or_create_customer(db, **values)
+    if picked:
+        for field, value in values.items():
+            setattr(picked, field, value)
+        customer = picked
+    else:
+        customer = get_or_create_customer(db, **values)
     db.session.flush()
 
     now = datetime.utcnow()

@@ -98,10 +98,12 @@ def create_app():
     from sh_portal.commands import (
         create_new_admin,
         import_sales,
+        link_sales_customers,
     )
     # Add flask commands - general
     app.cli.add_command(create_new_admin)
     app.cli.add_command(import_sales)
+    app.cli.add_command(link_sales_customers)
 
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 

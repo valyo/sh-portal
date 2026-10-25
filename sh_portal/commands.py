@@ -99,10 +99,12 @@ def import_sales(csv_path, dry_run):
     Rules: skörd from timestamp year when empty; konsistens default 'fast'; bigård default 'Solberg';
     customer names trimmed and normalized.
     """
-    from sh_portal.models import Sale, Product, SaleCategory
+    from sh_portal.models import Sale, Product, SaleCategory, Customer
+    from sh_portal.utils import customers_named
 
     created_products = 0
     created_sales = 0
+    created_customers = 0
     errors = []
 
     with open(csv_path, "r", encoding="utf-8") as f:
@@ -188,6 +190,22 @@ def import_sales(csv_path, dry_run):
                     created_sales += 1
                     continue
 
+                # Every buyer becomes a customer record: reuse the one with exactly this name, or
+                # create it. If several customers share the name we cannot tell which one, so the
+                # free-text name is kept on the sale.
+                customer = None
+                if customer_name:
+                    matches = customers_named(db, customer_name)
+                    if len(matches) == 1:
+                        customer = matches[0]
+                    elif not matches:
+                        customer = Customer(name=customer_name)
+                        db.session.add(customer)
+                        db.session.flush()
+                        created_customers += 1
+                    else:
+                        errors.append(f"Row {row_num}: several customers named '{customer_name}'; kept as free text")
+
                 sale = Sale(
                     timestamp=ts,
                     product_id=product.id,
@@ -198,8 +216,8 @@ def import_sales(csv_path, dry_run):
                     consistency=consistency,
                     apiary=apiary,
                     category_id=category.id,
-                    customer_id=None,
-                    customer_name=customer_name,
+                    customer_id=customer.id if customer else None,
+                    customer_name=None if customer else customer_name,
                     invoice_id=None,
                 )
                 db.session.add(sale)
@@ -218,8 +236,62 @@ def import_sales(csv_path, dry_run):
     if dry_run:
         flask.current_app.logger.info(f"DRY RUN: would create {created_sales} sales, {created_products} new products.")
     else:
-        flask.current_app.logger.info(f"Created {created_sales} sales, {created_products} new products.")
+        flask.current_app.logger.info(
+            f"Created {created_sales} sales, {created_products} new products, {created_customers} new customers.")
     for err in errors[:20]:
         flask.current_app.logger.warning(err)
     if len(errors) > 20:
         flask.current_app.logger.warning(f"... and {len(errors) - 20} more errors.")
+
+
+@click.command("link-sales-customers")
+@click.option("--dry-run", is_flag=True, help="Only report what would change, do not write to DB.")
+@flask.cli.with_appcontext
+def link_sales_customers(dry_run):
+    """Give sales that only have a free-text customer name a real customer record.
+
+    For each distinct name (ignoring case): an existing customer with exactly that name is
+    linked, otherwise a new name-only customer is created. If several customers share the
+    name the sales are left alone, to be fixed by hand. Safe to run more than once.
+    """
+    from sh_portal.models import Sale, Customer
+    from sh_portal.utils import customers_named, normalize_customer_name
+
+    sales = Sale.query.filter(Sale.customer_id.is_(None), Sale.customer_name.isnot(None)).all()
+    groups = {}
+    for sale in sales:
+        name = normalize_customer_name(sale.customer_name)
+        if name:
+            groups.setdefault(name.lower(), (name, []))[1].append(sale)
+
+    linked_sales = created_customers = reused_customers = 0
+    ambiguous = []
+    for _, (name, group) in sorted(groups.items()):
+        matches = customers_named(db, name)
+        if len(matches) > 1:
+            ambiguous.append(f"{name} ({len(group)} sales, {len(matches)} customers)")
+            continue
+        if matches:
+            customer = matches[0]
+            reused_customers += 1
+        else:
+            created_customers += 1
+            customer = None
+            if not dry_run:
+                customer = Customer(name=name)
+                db.session.add(customer)
+                db.session.flush()
+        linked_sales += len(group)
+        if not dry_run:
+            for sale in group:
+                sale.customer_id = customer.id
+                sale.customer_name = None
+
+    if not dry_run:
+        db.session.commit()
+    prefix = "DRY RUN: would link" if dry_run else "Linked"
+    click.echo(f"{prefix} {linked_sales} sales: {created_customers} new customers, "
+               f"{reused_customers} existing customers reused.")
+    for item in ambiguous:
+        click.echo(f"Skipped, several customers with this name: {item}")
+
