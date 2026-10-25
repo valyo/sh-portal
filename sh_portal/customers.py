@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, abort
-from .models import Customer
+from sqlalchemy import func
+from .models import Customer, Bookings, BookingsLamm
 from . import db
 
 customers_bp = Blueprint('customers', __name__)
@@ -12,6 +13,49 @@ def list_customers():
 
     customers_list = db.session.query(Customer).order_by(Customer.name).all()
     return render_template('customers.html', customers=customers_list, user=session.get('user'))
+
+
+@customers_bp.route('/api/customers')
+def customers_json():
+    """All customers for the booking form's customer picker, sorted by name.
+
+    With ?kind=andelsbiodling|lammandel&season_id=N each customer also gets `booked`: True if
+    someone with that email (case-insensitive) already has a booking of that kind in the season.
+    """
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    booking_models = {'andelsbiodling': Bookings, 'lammandel': BookingsLamm}
+    kind = request.args.get('kind')
+    if kind is not None and kind not in booking_models:
+        return jsonify({'error': 'kind must be andelsbiodling or lammandel'}), 400
+
+    season_id = request.args.get('season_id', type=int)
+    booked_emails = set()
+    if kind and season_id is not None:
+        model = booking_models[kind]
+        rows = (
+            db.session.query(Customer.email)
+            .join(model, model.customer_id == Customer.id)
+            .filter(model.season_id == season_id)
+            .all()
+        )
+        booked_emails = {email.lower() for (email,) in rows}
+
+    customers = db.session.query(Customer).order_by(func.lower(Customer.name), Customer.id).all()
+    return jsonify([
+        {
+            'id': c.id,
+            'name': c.name,
+            'email': c.email,
+            'telephone': c.telephone,
+            'address': c.address,
+            'postnummer': c.postnummer,
+            'ort': c.ort,
+            'booked': c.email.lower() in booked_emails,
+        }
+        for c in customers
+    ])
 
 
 @customers_bp.route('/api/customer/<int:customer_id>')

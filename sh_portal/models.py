@@ -1,10 +1,14 @@
 import json
+import math
 from . import db
 from flask_login import UserMixin
 from sqlalchemy.sql import func
 
 
 VAT_RATES = (6, 12)
+
+# Upper bound for a custom (hand-entered) price of one andel, in kr
+MAX_CUSTOM_PRICE = 100000
 
 
 class VatMixin:
@@ -123,6 +127,7 @@ class BookingsLamm(db.Model):
     certificate_sent_at = db.Column(db.DateTime, nullable=True)
     delivered_at = db.Column(db.DateTime, nullable=True)
     andel_tiers = db.Column(db.Text, nullable=True)
+    andel_custom_prices = db.Column(db.Text, nullable=True)  # JSON list: custom kr per andel, null = use the season price
 
     season = db.relationship('Season', backref=db.backref('bookings_lamm', lazy=True))
     customer = db.relationship('Customer', backref=db.backref('bookings_lamm', lazy=True))
@@ -163,17 +168,57 @@ class BookingsLamm(db.Model):
     def set_andel_tiers(self, raw_json):
         """Store per-andel price tiers from a JSON list; tier 2 is only allowed if the season has a second price."""
         allow_tier_2 = self.season.price_lamm_2 is not None
-        tiers = [2 if (int(t) == 2 and allow_tier_2) else 1 for t in json.loads(raw_json)]
+        tiers = [2 if (int(t) == 2 and allow_tier_2) else 1 for t in json.loads(raw_json)][:self.quantity]
         self.andel_tiers = json.dumps(tiers)
 
+    def get_andel_custom_prices(self):
+        """Custom unit price per andel (None = use the season price), padded/truncated to quantity."""
+        try:
+            raw = json.loads(self.andel_custom_prices) if self.andel_custom_prices else []
+        except (ValueError, TypeError):
+            raw = []
+        valid = [
+            float(v) if isinstance(v, (int, float)) and not isinstance(v, bool)
+            and math.isfinite(v) and 0 <= v <= MAX_CUSTOM_PRICE else None
+            for v in (raw if isinstance(raw, list) else [])
+        ][:self.quantity]
+        return valid + [None] * (self.quantity - len(valid))
+
+    def set_andel_custom_prices(self, raw_json):
+        """Store per-andel custom prices from a JSON list of numbers/nulls; raises ValueError if invalid."""
+        values = json.loads(raw_json)
+        if not isinstance(values, list) or len(values) > 200:
+            raise ValueError('Custom prices must be a list with one entry per andel')
+        cleaned = []
+        for v in values:
+            if v is None:
+                cleaned.append(None)
+            elif (isinstance(v, bool) or not isinstance(v, (int, float))
+                  or not math.isfinite(v) or not 0 <= v <= MAX_CUSTOM_PRICE):
+                raise ValueError(f'A custom price must be a number between 0 and {MAX_CUSTOM_PRICE}')
+            else:
+                cleaned.append(round(float(v), 2))
+        self.andel_custom_prices = json.dumps(cleaned[:self.quantity])
+
+    def trim_andel_lists(self):
+        """Drop per-andel entries beyond the current quantity, so a price entered for an andel that
+        no longer exists cannot come back if the quantity is raised again later."""
+        if self.andel_tiers:
+            self.andel_tiers = json.dumps(self.get_andel_tiers())
+        if self.andel_custom_prices:
+            self.andel_custom_prices = json.dumps(self.get_andel_custom_prices())
+
     def andel_prices(self, season=None):
-        """Unit price for each andel, resolved from the season's two Lammandel prices."""
+        """Unit price for each andel: its custom price if set, else the season's price 1 or 2."""
         season = season or self.season
         price_2 = season.price_lamm_2 if season.price_lamm_2 is not None else season.price_lamm
-        return [price_2 if t == 2 else season.price_lamm for t in self.get_andel_tiers()]
+        return [
+            custom if custom is not None else (price_2 if tier == 2 else season.price_lamm)
+            for custom, tier in zip(self.get_andel_custom_prices(), self.get_andel_tiers())
+        ]
 
     def total_price(self, season=None):
-        return sum(self.andel_prices(season))
+        return round(sum(self.andel_prices(season)), 2)
 
     def __repr__(self):
         return f'<BookingsLamm {self.name} - {self.season.year}>'
@@ -286,7 +331,7 @@ class InvoiceLamm(VatMixin, db.Model):
         items = []
         for price in sorted(set(prices)):
             qty = prices.count(price)
-            items.append({'quantity': qty, 'unit_price': price, 'total': qty * price})
+            items.append({'quantity': qty, 'unit_price': price, 'total': round(qty * price, 2)})
         return items
 
     def __repr__(self):

@@ -155,6 +155,7 @@ def get_booking(booking_id):
         'certificate_sent_at': booking.certificate_sent_at.isoformat() if booking.certificate_sent_at else None,
         'delivered_at': booking.delivered_at.isoformat() if booking.delivered_at else None,
         'andel_tiers': booking.get_andel_tiers(),
+        'andel_custom_prices': booking.get_andel_custom_prices(),
         'price_options': {
             '1': booking.season.price_lamm,
             '2': booking.season.price_lamm_2,
@@ -180,6 +181,7 @@ def update_booking(booking_id):
         booking.customer.ort = request.form.get('ort')
         booking.message = request.form.get('message')
         booking.quantity = parse_quantity(request.form.get('quantity'))
+        booking.trim_andel_lists()
         booking.certificate_name = request.form.get('certificate_name')
         cert_qty = (request.form.get('certificate_quantity') or '').strip()
         booking.certificate_quantity = parse_quantity(cert_qty, 'Certificate quantity') if cert_qty else None
@@ -194,6 +196,9 @@ def update_booking(booking_id):
         raw_tiers = request.form.get('andel_tiers')
         if raw_tiers is not None:
             booking.set_andel_tiers(raw_tiers)
+        raw_custom_prices = request.form.get('andel_custom_prices')
+        if raw_custom_prices is not None:
+            booking.set_andel_custom_prices(raw_custom_prices)
 
         delivered_mark = request.form.get('delivered')
         if delivered_mark == '1':
@@ -432,6 +437,9 @@ def create_booking():
         raw_tiers = request.form.get('andel_tiers')
         if raw_tiers is not None:
             booking.set_andel_tiers(raw_tiers)
+        raw_custom_prices = request.form.get('andel_custom_prices')
+        if raw_custom_prices is not None:
+            booking.set_andel_custom_prices(raw_custom_prices)
         db.session.commit()
     except Exception as e:
         db.session.rollback()

@@ -115,6 +115,8 @@ def create_app():
 
     from .utils import MAX_QUANTITY
     app.jinja_env.globals['MAX_QUANTITY'] = MAX_QUANTITY
+    from .models import MAX_CUSTOM_PRICE
+    app.jinja_env.globals['MAX_CUSTOM_PRICE'] = MAX_CUSTOM_PRICE
 
     @app.before_request
     def reject_cross_origin_writes():
