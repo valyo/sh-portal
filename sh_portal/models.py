@@ -53,16 +53,20 @@ class Admin(db.Model, UserMixin):
 
 
 class Customer(db.Model):
-    """Shared customer/contact data for bookings (andelsbiodling and lammandel)."""
+    """Every customer: andel customers (bookings) and pure sales customers.
+
+    Only the name is required. Contact details are optional here; the booking forms still
+    require them, because invoices and certificates need an email and an address.
+    """
     __tablename__ = 'customers'
 
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(150), nullable=False)
     name = db.Column(db.String(150), nullable=False)
-    telephone = db.Column(db.String(50), nullable=False)
-    address = db.Column(db.String(200), nullable=False)
-    postnummer = db.Column(db.String(10), nullable=False)
-    ort = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(150), nullable=True)
+    telephone = db.Column(db.String(50), nullable=True)
+    address = db.Column(db.String(200), nullable=True)
+    postnummer = db.Column(db.String(10), nullable=True)
+    ort = db.Column(db.String(100), nullable=True)
 
     def __repr__(self):
         return f'<Customer {self.name} ({self.email})>'

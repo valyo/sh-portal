@@ -200,6 +200,21 @@ Deploy using the production Docker Compose file and a pre-built image from GitHu
    docker compose run --rm --entrypoint "" app flask db upgrade
    ```
 
+### Customers and sales
+
+Every customer is a record in the customers table, not only the andel ones. Only the name is required; email, telephone and address are optional. Customers with bookings still need those details, because invoices and certificates use them.
+
+When you add a sale you pick an existing customer or type a new name, which is saved as a new customer (an existing customer with exactly that name is reused). Older sales that only have a free-text customer name can be converted once after upgrading:
+
+```bash
+docker compose exec backend flask link-sales-customers --dry-run   # preview
+docker compose exec backend flask link-sales-customers             # apply
+```
+
+It links each name to the existing customer with exactly that name, or creates a name-only customer; names shared by several customers are skipped and listed. `flask import-sales` now creates customers the same way.
+
+A customer can be deleted from the Customers page (Manage, then Delete customer) unless they have bookings, since bookings, invoices and certificates need a customer. Their sales stay in the sales list with the name as plain text. Do not run `link-sales-customers` again afterwards, or it recreates a customer from those names.
+
 ### Invoice PDF location
 
 Generated invoice PDFs are saved under `invoices/<andelsbiodling|lammandel>/<season year>/` next to the app (`/app/invoices` in the container, which is the `./data/invoices` volume). Set `INVOICES_DIR` in `.env` to store them somewhere else. The tests always use a temporary directory and never touch the real folder.
