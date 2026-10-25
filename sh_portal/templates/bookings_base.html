@@ -299,6 +299,13 @@
             <form id="manageBookingForm" method="POST">
                 <div class="modal-body">
                     <input type="hidden" id="bookingId" name="booking_id">
+                    <div class="mb-3 d-none" id="customerPickerGroup">
+                        <label for="customerPicker" class="form-label">Existing customer (optional)</label>
+                        <input type="text" class="form-control" id="customerPicker" list="customerOptions"
+                               placeholder="Type a name or email to pick a customer" autocomplete="off">
+                        <datalist id="customerOptions"></datalist>
+                        <div class="form-text" id="customerPickerHint">Pick a customer to fill in their details, or leave this empty and enter a new customer below.</div>
+                    </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="name" class="form-label">Name</label>
@@ -651,8 +658,72 @@ document.addEventListener('DOMContentLoaded', function() {
         const creating = mode === 'create';
         document.getElementById('manageBookingModalLabel').textContent = creating ? 'New Booking' : 'Manage Booking';
         document.getElementById('bookingDateGroup').classList.toggle('d-none', !creating);
+        document.getElementById('customerPickerGroup').classList.toggle('d-none', !creating);
         document.getElementById('sendCertificateBtn').classList.toggle('d-none', creating);
     }
+
+    // Customer picker (create mode): choosing a customer fills in the contact fields
+    const customerPicker = document.getElementById('customerPicker');
+    const customerOptions = document.getElementById('customerOptions');
+    const customerPickerHint = document.getElementById('customerPickerHint');
+    const CUSTOMER_PICKER_DEFAULT_HINT = customerPickerHint.textContent;
+    const CONTACT_FIELDS = ['name', 'email', 'telephone', 'address', 'postnummer', 'ort'];
+    let customersByLabel = {};
+    let pickedCustomer = null;
+
+    function setPickerHint(text, isProblem) {
+        customerPickerHint.textContent = text;
+        customerPickerHint.classList.toggle('text-danger', !!isProblem);
+        customerPicker.classList.toggle('is-invalid', !!isProblem);
+    }
+
+    function loadCustomerPicker() {
+        customersByLabel = {};
+        pickedCustomer = null;
+        customerOptions.innerHTML = '';
+        setPickerHint(CUSTOMER_PICKER_DEFAULT_HINT, false);
+        const kind = document.querySelector('h1').textContent.trim() === 'Lammandel' ? 'lammandel' : 'andelsbiodling';
+        const seasonId = document.getElementById('season_id').value;
+        fetch(`/api/customers?kind=${kind}&season_id=${encodeURIComponent(seasonId)}`)
+            .then(response => response.json())
+            .then(customers => {
+                customers.forEach(c => {
+                    let label = `${c.name} \u2014 ${c.email}`;
+                    if (customersByLabel[label]) label += ` #${c.id}`;
+                    customersByLabel[label] = c;
+                    const option = document.createElement('option');
+                    option.value = label;
+                    customerOptions.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading customers:', error);
+                setPickerHint('Could not load customers; enter the details below.', true);
+            });
+    }
+
+    function applyPickedCustomer() {
+        const typed = customerPicker.value;
+        const customer = customersByLabel[typed];
+        if (customer) {
+            pickedCustomer = customer;
+            CONTACT_FIELDS.forEach(f => { document.getElementById(f).value = customer[f] || ''; });
+            const season = document.querySelector('#season_id option:checked').textContent.trim();
+            if (customer.booked) {
+                setPickerHint(`${customer.name} already has a booking in ${season}. Edit that booking instead; creating another will be rejected.`, true);
+            } else {
+                setPickerHint('Details filled in from the customer record. Changing them here also updates the customer.', false);
+            }
+        } else if (typed === '' && pickedCustomer) {
+            pickedCustomer = null;
+            CONTACT_FIELDS.forEach(f => { document.getElementById(f).value = ''; });
+            setPickerHint(CUSTOMER_PICKER_DEFAULT_HINT, false);
+        } else if (pickedCustomer) {
+            pickedCustomer = null;
+            setPickerHint(CUSTOMER_PICKER_DEFAULT_HINT, false);
+        }
+    }
+    customerPicker.addEventListener('input', applyPickedCustomer);
 
     const newBookingBtn = document.getElementById('newBookingBtn');
     if (newBookingBtn) newBookingBtn.addEventListener('click', function() {
@@ -663,6 +734,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         document.getElementById('booking_date').value = now.toISOString().slice(0, 16);
+        loadCustomerPicker();
         if (this.dataset.priceOptions) {
             andelPriceOptions = JSON.parse(this.dataset.priceOptions);
             andelTiers = [];
