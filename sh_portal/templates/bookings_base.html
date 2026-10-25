@@ -613,40 +613,103 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Lammandel: per-andel price selection (price 1 / price 2 from the season)
+    // Lammandel: per-andel price: the season's price 1, price 2, or a custom price typed in
+    const MAX_CUSTOM_PRICE = {{ MAX_CUSTOM_PRICE }};
     let andelPriceOptions = null;
-    let andelTiers = [];
+    let andelChoices = [];   // one per andel: {tier: 1|2, isCustom: bool, value: string}
+    const newAndelChoice = () => ({tier: 1, isCustom: false, value: ''});
+
+    function setAndelChoices(tiers, customPrices) {
+        const count = Math.max((tiers || []).length, (customPrices || []).length);
+        andelChoices = [];
+        for (let i = 0; i < count; i++) {
+            const custom = (customPrices || [])[i];
+            const hasCustom = custom !== null && custom !== undefined;
+            andelChoices.push({tier: (tiers || [])[i] === 2 ? 2 : 1, isCustom: hasCustom, value: hasCustom ? String(custom) : ''});
+        }
+    }
+
+    function customPriceValue(choice) {
+        const text = String(choice.value).trim();
+        const n = Number(text);
+        return text !== '' && Number.isFinite(n) && n >= 0 && n <= MAX_CUSTOM_PRICE ? n : null;
+    }
+
     function renderAndelPrices() {
         const rows = document.getElementById('andelPriceRows');
         if (!rows || !andelPriceOptions) return;
         const qty = Math.max(0, Math.min({{ MAX_QUANTITY }}, parseInt(document.getElementById('quantity').value, 10) || 0));
-        andelTiers = andelTiers.slice(0, qty);
-        while (andelTiers.length < qty) andelTiers.push(1);
+        andelChoices = andelChoices.slice(0, qty);
+        while (andelChoices.length < qty) andelChoices.push(newAndelChoice());
         const hasPrice2 = andelPriceOptions['2'] !== null;
         rows.innerHTML = '';
-        andelTiers.forEach((tier, i) => {
+        andelChoices.forEach((choice, i) => {
+            if (!hasPrice2) choice.tier = 1;
             const col = document.createElement('div');
             col.className = 'col-6 col-md-4';
             const select = document.createElement('select');
             select.className = 'form-select form-select-sm';
             select.innerHTML = `<option value="1">Andel ${i + 1}: ${andelPriceOptions['1']} kr</option>` +
-                (hasPrice2 ? `<option value="2">Andel ${i + 1}: ${andelPriceOptions['2']} kr</option>` : '');
-            select.value = hasPrice2 && tier === 2 ? '2' : '1';
-            if (!hasPrice2) andelTiers[i] = 1;
+                (hasPrice2 ? `<option value="2">Andel ${i + 1}: ${andelPriceOptions['2']} kr</option>` : '') +
+                `<option value="custom">Andel ${i + 1}: custom price\u2026</option>`;
+            select.value = choice.isCustom ? 'custom' : String(choice.tier);
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = '0';
+            input.max = String(MAX_CUSTOM_PRICE);
+            input.step = '0.01';
+            input.placeholder = 'Price in kr';
+            input.className = 'form-control form-control-sm mt-1' + (choice.isCustom ? '' : ' d-none');
+            input.setAttribute('aria-label', `Custom price for andel ${i + 1}`);
+            input.value = choice.value;
+
             select.addEventListener('change', () => {
-                andelTiers[i] = parseInt(select.value, 10);
+                if (select.value === 'custom') {
+                    choice.isCustom = true;
+                    input.classList.remove('d-none');
+                    input.focus();
+                } else {
+                    choice.isCustom = false;
+                    choice.tier = parseInt(select.value, 10);
+                    input.classList.add('d-none');
+                    input.classList.remove('is-invalid');
+                }
+                updateAndelTotal();
+            });
+            input.addEventListener('input', () => {
+                choice.value = input.value;
+                input.classList.remove('is-invalid');
                 updateAndelTotal();
             });
             col.appendChild(select);
+            col.appendChild(input);
             rows.appendChild(col);
         });
         updateAndelTotal();
     }
+
     function updateAndelTotal() {
         const totalEl = document.getElementById('andelPriceTotal');
         if (!totalEl || !andelPriceOptions) return;
-        const total = andelTiers.reduce((sum, t) => sum + (t === 2 && andelPriceOptions['2'] !== null ? andelPriceOptions['2'] : andelPriceOptions['1']), 0);
-        totalEl.textContent = total;
+        const total = andelChoices.reduce((sum, c) => {
+            if (c.isCustom) return sum + (customPriceValue(c) || 0);
+            return sum + (c.tier === 2 && andelPriceOptions['2'] !== null ? andelPriceOptions['2'] : andelPriceOptions['1']);
+        }, 0);
+        totalEl.textContent = Math.round(total * 100) / 100;
+    }
+
+    // Returns the first andel whose custom price is missing/invalid (and flags its field), or null
+    function findInvalidCustomPrice() {
+        const inputs = document.querySelectorAll('#andelPriceRows input');
+        for (let i = 0; i < andelChoices.length; i++) {
+            if (andelChoices[i].isCustom && customPriceValue(andelChoices[i]) === null) {
+                inputs[i].classList.add('is-invalid');
+                inputs[i].focus();
+                return i + 1;
+            }
+        }
+        return null;
     }
     const quantityInput = document.getElementById('quantity');
     if (quantityInput) quantityInput.addEventListener('input', renderAndelPrices);
@@ -737,7 +800,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadCustomerPicker();
         if (this.dataset.priceOptions) {
             andelPriceOptions = JSON.parse(this.dataset.priceOptions);
-            andelTiers = [];
+            andelChoices = [];
             renderAndelPrices();
         }
         if (manageBookingModal) manageBookingModal.show();
@@ -774,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('certificate_sent').checked = !!data.certificate_sent_at;
                     document.getElementById('delivered').checked = !!data.delivered_at;
                     andelPriceOptions = data.price_options || null;
-                    andelTiers = data.andel_tiers || [];
+                    setAndelChoices(data.andel_tiers, data.andel_custom_prices);
                     renderAndelPrices();
 
                     // Store the payment status on the button itself
@@ -799,7 +862,13 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.set('certificate_sent', document.getElementById('certificate_sent').checked ? '1' : '0');
         formData.set('delivered', document.getElementById('delivered').checked ? '1' : '0');
         if (document.getElementById('andelPricesSection')) {
-            formData.set('andel_tiers', JSON.stringify(andelTiers));
+            const badAndel = findInvalidCustomPrice();
+            if (badAndel !== null) {
+                showNotification(`Enter a price between 0 and ${MAX_CUSTOM_PRICE} kr for andel ${badAndel}, or pick one of the season prices.`, true);
+                return;
+            }
+            formData.set('andel_tiers', JSON.stringify(andelChoices.map(c => c.tier)));
+            formData.set('andel_custom_prices', JSON.stringify(andelChoices.map(c => c.isCustom ? customPriceValue(c) : null)));
         }
 
         // Determine the API prefix based on the page title
