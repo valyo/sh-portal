@@ -212,3 +212,110 @@ def delete_customer(customer_id):
         return jsonify({'success': False, 'message': str(e)}), 500
     return jsonify({'success': True, 'message': f'Customer {name} deleted', 'sales_kept': sales_kept})
 
+
+
+def _describe(customer):
+    """Name plus email, so two customers with the same name can be told apart."""
+    return f'{customer.name} ({customer.email})' if customer.email else customer.name
+
+
+def _merge_plan(keep, duplicate):
+    """What merging `duplicate` into `keep` would do, or an error if it cannot be done.
+
+    One booking per customer per season and kind is the rule everywhere else, so a season in
+    which both customers have a booking of the same kind blocks the merge: someone has to
+    decide which booking is the real one, and the app has no booking delete.
+    """
+    conflicts = []
+    moves = []
+    for kind, label, mine, theirs in (
+        ('andelsbiodling', 'Andelsbiodling', keep.bookings, duplicate.bookings),
+        ('lammandel', 'Lammandel', keep.bookings_lamm, duplicate.bookings_lamm),
+    ):
+        kept_seasons = {b.season_id for b in mine}
+        for b in theirs:
+            entry = {'type': kind, 'label': label, 'year': b.season.year, 'booking_id': b.id}
+            (conflicts if b.season_id in kept_seasons else moves).append(entry)
+    filled = [f for f in CUSTOMER_DETAIL_FIELDS if not getattr(keep, f) and getattr(duplicate, f)]
+    error = None
+    if conflicts:
+        seasons = ', '.join(sorted({f"{c['year']} {c['label']}" for c in conflicts}))
+        error = (f'Both {_describe(keep)} and {_describe(duplicate)} have a booking in {seasons}. '
+                 'A customer can only have one booking per season, so these cannot be merged.')
+    return {
+        'keep': {'id': keep.id, 'name': keep.name, 'email': keep.email},
+        'duplicate': {'id': duplicate.id, 'name': duplicate.name, 'email': duplicate.email},
+        'bookings': moves,
+        'sales_count': len(duplicate.sales),
+        'filled_fields': filled,
+        'error': error,
+    }
+
+
+def _merge_pair(customer_id):
+    """(keep, duplicate, error): the customer in the URL and the posted `duplicate_id`; error is a message or None."""
+    keep = db.session.get(Customer, customer_id)
+    if keep is None:
+        abort(404)
+    duplicate_id = request.values.get('duplicate_id', type=int)
+    if duplicate_id is None:
+        return keep, None, 'Choose the customer to merge.'
+    if duplicate_id == keep.id:
+        return keep, None, 'A customer cannot be merged into itself.'
+    duplicate = db.session.get(Customer, duplicate_id)
+    if duplicate is None:
+        return keep, None, 'The customer to merge does not exist.'
+    return keep, duplicate, None
+
+
+@customers_bp.route('/api/customer/<int:customer_id>/merge-preview')
+def merge_customer_preview(customer_id):
+    """What merging ?duplicate_id=N into this customer would move. Changes nothing."""
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    keep, duplicate, error = _merge_pair(customer_id)
+    if error:
+        return jsonify({'success': False, 'message': error}), 400
+    plan = _merge_plan(keep, duplicate)
+    return jsonify({'success': plan['error'] is None, 'message': plan['error'], 'plan': plan})
+
+
+@customers_bp.route('/api/customer/<int:customer_id>/merge', methods=['POST'])
+def merge_customer(customer_id):
+    """Merge the customer `duplicate_id` into this one, then delete the duplicate.
+
+    The duplicate's bookings and sales are re-pointed to this customer, which keeps its own
+    name and email (from now on invoices and certificates use them; those already sent are not
+    touched). Contact details this customer lacks are taken from the duplicate. All of it
+    happens in one transaction.
+    """
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    keep, duplicate, error = _merge_pair(customer_id)
+    if error:
+        return jsonify({'success': False, 'message': error}), 400
+    plan = _merge_plan(keep, duplicate)
+    if plan['error']:
+        return jsonify({'success': False, 'message': plan['error']}), 400
+
+    try:
+        for field in plan['filled_fields']:
+            setattr(keep, field, getattr(duplicate, field))
+        duplicate_name = duplicate.name
+        for booking in list(duplicate.bookings) + list(duplicate.bookings_lamm) + list(duplicate.sales):
+            booking.customer_id = keep.id
+        db.session.flush()
+        db.session.expire(duplicate)  # reload its (now empty) collections so delete leaves the moved rows alone
+        db.session.delete(duplicate)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    return jsonify({
+        'success': True,
+        'message': f'{duplicate_name} merged into {keep.name}',
+        'bookings_moved': len(plan['bookings']),
+        'sales_moved': plan['sales_count'],
+    })

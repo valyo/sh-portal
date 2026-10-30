@@ -121,6 +121,20 @@
                             </div>
                             <div class="form-text">Seasons this customer has bookings in (Andelsbiodling and/or Lammandel).</div>
                         </div>
+                        <div class="mb-3" id="customerMergeGroup">
+                            <label class="form-label fw-bold" for="mergeDuplicateSelect">Merge a duplicate into this customer</label>
+                            <div class="input-group">
+                                <select class="form-select" id="mergeDuplicateSelect">
+                                    <option value="">Choose the duplicate…</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" id="mergeCustomerBtn" disabled>
+                                    <i class="bi bi-intersect"></i> Merge
+                                </button>
+                            </div>
+                            <div class="form-text" id="mergePreview" style="min-height: 1.5em;">
+                                Moves the duplicate's bookings and sales to this customer, then deletes the duplicate.
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-danger me-auto" id="deleteCustomerBtn">
@@ -165,6 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('manageCustomerModalLabel').textContent = creating ? 'New Customer' : 'Manage Customer';
         document.getElementById('customerBookingsGroup').classList.toggle('d-none', creating);
         document.getElementById('deleteCustomerBtn').classList.toggle('d-none', creating);
+        document.getElementById('customerMergeGroup').classList.toggle('d-none', creating);
     }
 
     const newCustomerBtn = document.getElementById('newCustomerBtn');
@@ -199,6 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     deleteBtn.title = hasBookings ? 'This customer has bookings, so it cannot be deleted' : '';
                     deleteBtn.dataset.name = data.name || '';
                     deleteBtn.dataset.sales = data.sales_count || 0;
+                    loadMergeCandidates(customerId);
                     if (manageCustomerModal) manageCustomerModal.show();
                 })
                 .catch(function(err) {
@@ -206,6 +222,100 @@ document.addEventListener('DOMContentLoaded', function() {
                     bookingsListEl.innerHTML = '<span class="text-danger">Error loading customer.</span>';
                 });
         });
+    });
+
+    const mergeSelect = document.getElementById('mergeDuplicateSelect');
+    const mergeBtn = document.getElementById('mergeCustomerBtn');
+    const mergePreviewEl = document.getElementById('mergePreview');
+    const mergeHint = mergePreviewEl.textContent.trim();
+    let mergePlan = null;
+
+    function setMergePreview(text, isError) {
+        mergePreviewEl.textContent = text;
+        mergePreviewEl.classList.toggle('text-danger', !!isError);
+    }
+
+    function resetMerge() {
+        mergePlan = null;
+        mergeBtn.disabled = true;
+        setMergePreview(mergeHint, false);
+    }
+
+    function loadMergeCandidates(customerId) {
+        mergeSelect.length = 1;
+        resetMerge();
+        fetch('/api/customers')
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                list.forEach(function(c) {
+                    if (String(c.id) === String(customerId)) return;
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name + (c.email ? ' — ' + c.email : '') + ' (#' + c.id + ')';
+                    mergeSelect.appendChild(opt);
+                });
+            });
+    }
+
+    function describeMerge(plan) {
+        const dup = plan.duplicate.name;
+        const bookings = plan.bookings.map(function(b) { return b.year + ' ' + b.label; });
+        const parts = [];
+        if (bookings.length) parts.push('bookings ' + bookings.join(', '));
+        if (plan.sales_count) parts.push(plan.sales_count + (plan.sales_count === 1 ? ' sale' : ' sales'));
+        let text = parts.length ? 'Moves ' + parts.join(' and ') + ' from ' + dup + ' to this customer.' : dup + ' has no bookings or sales to move.';
+        if (bookings.length) {
+            text += ' New invoices and certificates for them will use this customer\'s email' +
+                (plan.keep.email ? ' (' + plan.keep.email + ')' : '') + '.';
+        }
+        if (plan.filled_fields.length) text += ' Missing ' + plan.filled_fields.join(', ') + ' will be copied from ' + dup + '.';
+        return text + ' ' + dup + ' is then deleted.';
+    }
+
+    mergeSelect.addEventListener('change', function() {
+        resetMerge();
+        if (!this.value) return;
+        const customerId = document.getElementById('customerId').value;
+        const chosen = this.value;
+        setMergePreview('Checking…', false);
+        fetch('/api/customer/' + customerId + '/merge-preview?duplicate_id=' + encodeURIComponent(chosen))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (mergeSelect.value !== chosen) return;  // choice changed while loading
+                if (data.success) {
+                    mergePlan = data.plan;
+                    mergeBtn.disabled = false;
+                    setMergePreview(describeMerge(data.plan), false);
+                } else {
+                    setMergePreview(data.message || data.error || 'This merge is not possible.', true);
+                }
+            })
+            .catch(function() { setMergePreview('Could not check this merge.', true); });
+    });
+
+    mergeBtn.addEventListener('click', function() {
+        if (!mergePlan) return;
+        const customerId = document.getElementById('customerId').value;
+        if (!confirm(describeMerge(mergePlan) + '\n\nThis cannot be undone.')) return;
+        const body = new FormData();
+        body.set('duplicate_id', mergePlan.duplicate.id);
+        mergeBtn.disabled = true;
+        fetch('/api/customer/' + customerId + '/merge', { method: 'POST', body: body })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (manageCustomerModal) manageCustomerModal.hide();
+                    window.location.reload();
+                } else {
+                    mergeBtn.disabled = false;
+                    alert('Error merging customers: ' + (data.message || data.error || 'Unknown error'));
+                }
+            })
+            .catch(function(err) {
+                console.error('Error merging customers:', err);
+                mergeBtn.disabled = false;
+                alert('Error merging customers.');
+            });
     });
 
     document.getElementById('deleteCustomerBtn').addEventListener('click', function() {

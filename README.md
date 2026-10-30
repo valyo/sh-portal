@@ -215,6 +215,8 @@ It links each name to the existing customer with exactly that name, or creates a
 
 A customer can be deleted from the Customers page (Manage, then Delete customer) unless they have bookings, since bookings, invoices and certificates need a customer. Their sales stay in the sales list with the name as plain text. Do not run `link-sales-customers` again afterwards, or it recreates a customer from those names.
 
+The same person can end up as two customers (for example with two email addresses). Open the one to keep, pick the duplicate under "Merge a duplicate into this customer", check the preview and confirm. The duplicate's bookings and sales move to the customer you opened, which keeps its own name and email (details it lacks are copied over), and the duplicate is deleted. Invoices and certificates already sent are not touched. If both customers have a booking of the same kind in the same season the merge is refused, because a customer can only have one booking per season. Names shared by two customers are skipped by `link-sales-customers` until they are merged, so merge them and run it again.
+
 ### Invoice PDF location
 
 Generated invoice PDFs are saved under `invoices/<andelsbiodling|lammandel>/<season year>/` next to the app (`/app/invoices` in the container, which is the `./data/invoices` volume). Set `INVOICES_DIR` in `.env` to store them somewhere else. The tests always use a temporary directory and never touch the real folder.
