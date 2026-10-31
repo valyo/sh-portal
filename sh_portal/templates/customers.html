@@ -39,8 +39,9 @@
                                     <td>{{ customer.postnummer or '' }}</td>
                                     <td>{{ customer.ort or '' }}</td>
                                     <td>
-                                        {% set honey_count = customer.bookings|length %}
-                                        {% set lamb_count = customer.bookings_lamm|length %}
+                                        {% set c = counts.get(customer.id, {}) %}
+                                        {% set honey_count = c.get('honey', 0) %}
+                                        {% set lamb_count = c.get('lamb', 0) %}
                                         {% if honey_count or lamb_count %}
                                             {% if honey_count %}<span class="badge bg-warning text-dark">Andelsbiodling: {{ honey_count }}</span>{% endif %}
                                             {% if lamb_count %}<span class="badge bg-secondary ms-1">Lammandel: {{ lamb_count }}</span>{% endif %}
@@ -49,7 +50,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% set sales_count = customer.sales|length %}
+                                        {% set sales_count = c.get('sales', 0) %}
                                         {% if sales_count %}<span class="badge bg-success">Sales: {{ sales_count }}</span>{% else %}<span class="text-muted">&mdash;</span>{% endif %}
                                     </td>
                                     <td>

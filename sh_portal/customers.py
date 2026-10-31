@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, abort
 from sqlalchemy import func
-from .models import Customer, Bookings, BookingsLamm
+from .models import Customer, Bookings, BookingsLamm, Invoice, Sale, SaleCategory
 from .utils import clean_optional, CUSTOMER_DETAIL_FIELDS, CUSTOMER_NAME_MAX
 from . import db
 
@@ -13,7 +13,51 @@ def list_customers():
         return redirect(url_for('main.home'))
 
     customers_list = db.session.query(Customer).order_by(Customer.name).all()
-    return render_template('customers.html', customers=customers_list, user=session.get('user'))
+    return render_template('customers.html', customers=customers_list, counts=_activity_counts(),
+                           user=session.get('user'))
+
+
+def _activity_counts():
+    """{customer_id: {'honey', 'lamb', 'sales'}} for the customers table.
+
+    Every sale in the "andel" category is an Andelsbiodling share, whether it was imported or
+    created when an invoice was paid, so those count as Andelsbiodling and not as plain sales.
+    An Andelsbiodling booking whose invoice has already produced such a sale is not counted a
+    second time; one that has no sale yet (not invoiced, or not paid) counts as one share.
+    """
+    counts = {}
+
+    def bump(customer_id, key, n):
+        counts.setdefault(customer_id, {'honey': 0, 'lamb': 0, 'sales': 0})[key] += n
+
+    is_andel = SaleCategory.name == 'andel'
+    for customer_id, is_andel_sale, n in (
+        db.session.query(Sale.customer_id, is_andel, func.count(Sale.id))
+        .join(SaleCategory, Sale.category_id == SaleCategory.id)
+        .filter(Sale.customer_id.isnot(None))
+        .group_by(Sale.customer_id, is_andel)
+    ):
+        bump(customer_id, 'honey' if is_andel_sale else 'sales', n)
+
+    has_sale = (
+        db.session.query(Sale.id)
+        .join(Invoice, Sale.invoice_id == Invoice.id)
+        .filter(Invoice.booking_id == Bookings.id)
+        .exists()
+    )
+    for customer_id, n in (
+        db.session.query(Bookings.customer_id, func.count(Bookings.id))
+        .filter(~has_sale)
+        .group_by(Bookings.customer_id)
+    ):
+        bump(customer_id, 'honey', n)
+
+    for customer_id, n in (
+        db.session.query(BookingsLamm.customer_id, func.count(BookingsLamm.id))
+        .group_by(BookingsLamm.customer_id)
+    ):
+        bump(customer_id, 'lamb', n)
+    return counts
 
 
 @customers_bp.route('/api/customers')
