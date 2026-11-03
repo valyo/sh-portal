@@ -3,6 +3,17 @@
 {% block title %}Customers - SH Portal{% endblock %}
 
 {% block content %}
+<style>
+/* The title, button and table header stay put; only the rows scroll. */
+.customers-table-wrapper { max-height: calc(100vh - 15rem); overflow-y: auto; }
+.customers-table-wrapper thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8f9fa;
+    box-shadow: 0 1px 0 0 #dee2e6;
+}
+</style>
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -14,7 +25,7 @@
 
             <div class="card">
                 <div class="card-body">
-                    <div class="table-responsive">
+                    <div class="table-responsive customers-table-wrapper">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
@@ -43,7 +54,9 @@
                                         {% set honey_count = c.get('honey', 0) %}
                                         {% set lamb_count = c.get('lamb', 0) %}
                                         {% if honey_count or lamb_count %}
-                                            {% if honey_count %}<span class="badge bg-warning text-dark">Andelsbiodling: {{ honey_count }}</span>{% endif %}
+                                            {% set unpaid_count = c.get('unpaid', 0) %}
+                                            {% if honey_count and unpaid_count %}<span class="badge bg-danger" title="{{ unpaid_count }} not paid">Andelsbiodling: {{ honey_count }}</span>
+                                            {% elif honey_count %}<span class="badge bg-warning text-dark">Andelsbiodling: {{ honey_count }}</span>{% endif %}
                                             {% if lamb_count %}<span class="badge bg-secondary ms-1">Lammandel: {{ lamb_count }}</span>{% endif %}
                                         {% else %}
                                             <span class="text-muted">—</span>
@@ -116,11 +129,11 @@
                         </div>
                         <div class="form-text mb-3">Only the name is required. Customers with bookings also need their email and address details, because invoices and certificates use them.</div>
                         <div class="mb-3" id="customerBookingsGroup">
-                            <label class="form-label fw-bold">Bookings by season</label>
+                            <label class="form-label fw-bold">Shares by season</label>
                             <div id="customerBookingsList" class="border rounded p-2 bg-light small">
                                 <span class="text-muted">Loading…</span>
                             </div>
-                            <div class="form-text">Seasons this customer has bookings in (Andelsbiodling and/or Lammandel).</div>
+                            <div class="form-text">Seasons this customer has shares in: Andelsbiodling (bookings and earlier sales) and/or Lammandel.</div>
                         </div>
                         <div class="mb-3" id="customerMergeGroup">
                             <label class="form-label fw-bold" for="mergeDuplicateSelect">Merge a duplicate into this customer</label>
@@ -151,26 +164,50 @@
 
     <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const tableWrapper = document.querySelector('.customers-table-wrapper');
+    function fitTable() {
+        if (!tableWrapper) return;
+        const room = window.innerHeight - tableWrapper.getBoundingClientRect().top - 44;
+        tableWrapper.style.maxHeight = Math.max(room, 200) + 'px';
+    }
+    fitTable();
+    window.addEventListener('resize', fitTable);
+
     const manageCustomerModalEl = document.getElementById('manageCustomerModal');
     const manageCustomerModal = manageCustomerModalEl ? new bootstrap.Modal(manageCustomerModalEl) : null;
     const manageCustomerForm = document.getElementById('manageCustomerForm');
     const bookingsListEl = document.getElementById('customerBookingsList');
 
-    function renderBookings(bookings) {
-        if (!bookings || bookings.length === 0) {
+    const UNPAID = ' - not paid';
+
+    function renderBookings(shares) {
+        if (!shares || shares.length === 0) {
             bookingsListEl.innerHTML = '<span class="text-muted">No bookings.</span>';
             return;
         }
         const byYear = {};
-        bookings.forEach(function(b) {
-            const year = b.year;
-            if (!byYear[year]) byYear[year] = [];
-            byYear[year].push(b.type === 'lammandel' ? 'Lammandel' : 'Andelsbiodling');
+        shares.forEach(function(b) {
+            let label = b.type === 'lammandel' ? 'Lammandel' : 'Andelsbiodling';
+            if (b.paid === false) label += UNPAID;
+            if (!byYear[b.year]) byYear[b.year] = {};
+            byYear[b.year][label] = (byYear[b.year][label] || 0) + 1;
         });
-        const lines = Object.keys(byYear).sort(function(a, b) { return parseInt(b, 10) - parseInt(a, 10); }).map(function(year) {
-            return year + ': ' + byYear[year].join(', ');
+        const rank = function(y) { return /^\d+$/.test(y) ? parseInt(y, 10) : -1; };
+        const lines = Object.keys(byYear).sort(function(a, b) { return rank(b) - rank(a); }).map(function(year) {
+            const parts = Object.keys(byYear[year]).sort().map(function(label) {
+                const n = byYear[year][label];
+                return n > 1 ? label + ' ×' + n : label;
+            });
+            return year + ': ' + parts.join(', ');
         });
-        bookingsListEl.innerHTML = lines.join('<br>');
+        bookingsListEl.textContent = '';
+        lines.forEach(function(line, i) {
+            if (i) bookingsListEl.appendChild(document.createElement('br'));
+            const span = document.createElement('span');
+            span.textContent = line;
+            if (line.indexOf(UNPAID) !== -1) span.className = 'text-danger';
+            bookingsListEl.appendChild(span);
+        });
     }
 
     let customerModalMode = 'edit';
@@ -208,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('customerAddress').value = data.address || '';
                     document.getElementById('customerPostnummer').value = data.postnummer || '';
                     document.getElementById('customerOrt').value = data.ort || '';
-                    renderBookings(data.bookings);
+                    renderBookings(data.seasons);
                     const deleteBtn = document.getElementById('deleteCustomerBtn');
                     const hasBookings = (data.bookings || []).length > 0;
                     deleteBtn.disabled = hasBookings;
