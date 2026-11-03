@@ -181,7 +181,7 @@
                                     <td>{{ "%.2f"|format(s.unit_price) }} kr</td>
                                     <td>{{ "%.2f"|format(s.total_price) }} kr</td>
                                     <td><span class="badge bg-secondary">{{ s.category.name if s.category else '—' }}</span></td>
-                                    <td>{{ s.display_customer }}</td>
+                                    <td>{% if s.customer_id %}<a href="{{ url_for('customers.list_customers', manage=s.customer_id) }}">{{ s.display_customer }}</a>{% else %}{{ s.display_customer }}{% endif %}</td>
                                     <td>{% if s.invoice_id %}<i class="bi bi-check-circle text-success" title="Andel invoice"></i>{% else %}—{% endif %}</td>
                                     <td>
                                         {% if not s.invoice_id %}
