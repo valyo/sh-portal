@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, abort
 from sqlalchemy import func
-from .models import Customer, Bookings, BookingsLamm, Invoice, Sale, SaleCategory
+from .models import Customer, Bookings, BookingsLamm, Invoice, Sale, SaleCategory, Season
 from .utils import clean_optional, CUSTOMER_DETAIL_FIELDS, CUSTOMER_NAME_MAX
 from . import db
 
@@ -17,18 +17,43 @@ def list_customers():
                            user=session.get('user'))
 
 
+def _shares_by_season(customer):
+    """[{'year', 'type'}] for the customer card, by the same rule as the table's counts.
+
+    One entry per Andelsbiodling share: every "andel" sale, plus each booking that is not
+    already one of those sales (see _activity_counts). Lammandel has no sales, so those are
+    its bookings. A share that is only a booking has not been paid (paying the invoice creates its
+    sale), so it is flagged `paid: False`.
+    """
+    andel_sales = [s for s in customer.sales if s.category and s.category.name == 'andel']
+    sale_years = {s.skord for s in andel_sales}
+    invoiced = {s.invoice.booking_id for s in andel_sales if s.invoice}
+    shares = [{'year': s.skord, 'type': 'andelsbiodling', 'paid': True} for s in andel_sales]
+    shares += [
+        {'year': b.season.year, 'type': 'andelsbiodling', 'paid': False}
+        for b in customer.bookings
+        if b.id not in invoiced and b.season.year not in sale_years
+    ]
+    shares += [{'year': b.season.year, 'type': 'lammandel'} for b in customer.bookings_lamm]
+    shares.sort(key=lambda x: (-int(x['year']) if x['year'].isdigit() else 1, x['type']))
+    return shares
+
+
 def _activity_counts():
-    """{customer_id: {'honey', 'lamb', 'sales'}} for the customers table.
+    """{customer_id: {'honey', 'unpaid', 'lamb', 'sales'}} for the customers table.
 
     Every sale in the "andel" category is an Andelsbiodling share, whether it was imported or
     created when an invoice was paid, so those count as Andelsbiodling and not as plain sales.
-    An Andelsbiodling booking whose invoice has already produced such a sale is not counted a
-    second time; one that has no sale yet (not invoiced, or not paid) counts as one share.
+    An Andelsbiodling booking is not counted a second time when its share is already among those
+    sales: either its invoice produced one, or the customer has an "andel" sale for that season's
+    harvest year (older shares were imported as sales while the booking was entered separately).
+    A booking with neither counts as one share, and as an unpaid one (`unpaid` is how many of
+    the `honey` shares are such bookings).
     """
     counts = {}
 
     def bump(customer_id, key, n):
-        counts.setdefault(customer_id, {'honey': 0, 'lamb': 0, 'sales': 0})[key] += n
+        counts.setdefault(customer_id, {'honey': 0, 'unpaid': 0, 'lamb': 0, 'sales': 0})[key] += n
 
     is_andel = SaleCategory.name == 'andel'
     for customer_id, is_andel_sale, n in (
@@ -39,18 +64,28 @@ def _activity_counts():
     ):
         bump(customer_id, 'honey' if is_andel_sale else 'sales', n)
 
-    has_sale = (
+    from_invoice = (
         db.session.query(Sale.id)
         .join(Invoice, Sale.invoice_id == Invoice.id)
         .filter(Invoice.booking_id == Bookings.id)
         .exists()
     )
+    same_season = (
+        db.session.query(Sale.id)
+        .join(SaleCategory, Sale.category_id == SaleCategory.id)
+        .filter(SaleCategory.name == 'andel',
+                Sale.customer_id == Bookings.customer_id,
+                Sale.skord == Season.year)
+        .exists()
+    )
     for customer_id, n in (
         db.session.query(Bookings.customer_id, func.count(Bookings.id))
-        .filter(~has_sale)
+        .join(Season, Bookings.season_id == Season.id)
+        .filter(~from_invoice, ~same_season)
         .group_by(Bookings.customer_id)
     ):
         bump(customer_id, 'honey', n)
+        bump(customer_id, 'unpaid', n)
 
     for customer_id, n in (
         db.session.query(BookingsLamm.customer_id, func.count(BookingsLamm.id))
@@ -142,6 +177,7 @@ def get_customer(customer_id):
         'postnummer': customer.postnummer,
         'ort': customer.ort,
         'bookings': bookings_info,
+        'seasons': _shares_by_season(customer),
         'sales_count': len(customer.sales),
     })
 
