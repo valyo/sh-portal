@@ -262,6 +262,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // /customers?manage=<id> (linked from the bookings, invoices and sales lists) opens that customer's form.
+    const manageId = new URLSearchParams(window.location.search).get('manage');
+    if (manageId) {
+        const manageBtn = document.querySelector('.manage-customer[data-customer-id="' + CSS.escape(manageId) + '"]');
+        if (manageBtn) manageBtn.click();
+        history.replaceState(null, '', window.location.pathname);
+    }
+
     const mergeSelect = document.getElementById('mergeDuplicateSelect');
     const mergeBtn = document.getElementById('mergeCustomerBtn');
     const mergePreviewEl = document.getElementById('mergePreview');

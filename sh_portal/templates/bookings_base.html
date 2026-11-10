@@ -177,7 +177,7 @@
                                                                name="selected_bookings[]" value="{{ booking.id }}">
                                                     </div>
                                                 </td>
-                                                <td>{{ booking.name }}</td>
+                                                <td><a href="{{ url_for('customers.list_customers', manage=booking.customer_id) }}">{{ booking.name }}</a></td>
                                                 <td>{{ booking.quantity }}</td>
                                                 <td>
                                                     {% if booking.id in invoices %}
@@ -250,7 +250,7 @@
                                         {% for invoice in invoices.values() %}
                                         <tr>
                                             <td>{{ invoice.invoice_id }}</td>
-                                            <td>{{ invoice.booking.name }}</td>
+                                            <td><a href="{{ url_for('customers.list_customers', manage=invoice.booking.customer_id) }}">{{ invoice.booking.name }}</a></td>
                                             <td>{{ invoice.date_created.strftime('%Y-%m-%d') }}</td>
                                             <td>{{ 'Yes' if invoice.sent else 'No' }}</td>
                                             <td>{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else 'Not paid' }}</td>
