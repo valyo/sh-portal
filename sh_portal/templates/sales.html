@@ -161,7 +161,7 @@
                             </thead>
                             <tbody>
                                 {% for s in sales %}
-                                <tr {% if not s.invoice_id %}data-sale-id="{{ s.id }}"
+                                <tr {% if not s.from_invoice %}data-sale-id="{{ s.id }}"
                                     data-sale-date="{{ s.timestamp.strftime('%Y-%m-%d') if s.timestamp else '' }}"
                                     data-sale-product-id="{{ s.product_id }}"
                                     data-sale-skord="{{ s.skord or '' }}"
@@ -184,7 +184,7 @@
                                     <td>{% if s.customer_id %}<a href="{{ url_for('customers.list_customers', manage=s.customer_id) }}">{{ s.display_customer }}</a>{% else %}{{ s.display_customer }}{% endif %}</td>
                                     <td>{% if s.invoice_id %}<i class="bi bi-check-circle text-success" title="Andel invoice"></i>{% elif s.lamm_invoice_id %}<i class="bi bi-check-circle text-success" title="Lammandel invoice"></i>{% else %}—{% endif %}</td>
                                     <td>
-                                        {% if not s.invoice_id %}
+                                        {% if not s.from_invoice %}
                                         <button type="button" class="btn btn-sm btn-outline-primary sale-edit-btn" title="Edit">Edit</button>
                                         {% else %}
                                         <span class="text-muted">—</span>
@@ -232,20 +232,20 @@
                                 <select class="form-select" id="sale_product_id" name="product_id" required>
                                     <option value="">— Select —</option>
                                     {% for p in products %}
-                                    <option value="{{ p.id }}">{{ p.name }}</option>
+                                    <option value="{{ p.id }}"{% if p.name == 'lammkött' %} data-lamb="1"{% endif %}>{{ p.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="sale_skord" name="skord" placeholder="e.g. 2024 or okänd" maxlength="20" required>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="sale_burk_kg" class="form-label">Burk (kg)</label>
                                 <input type="number" class="form-control" id="sale_burk_kg" name="burk_kg" placeholder="e.g. 2.5" step="0.01" min="0">
                                 <small class="text-muted">Jar size in kg. Leave empty if not applicable.</small>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
                                 <select class="form-select" id="sale_consistency" name="consistency">
                                     <option value="fast">fast</option>
@@ -253,17 +253,29 @@
                                     <option value="fryst">fryst</option>
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="sale_unit_price" name="unit_price" step="0.01" min="0" required>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="sale_quantity" name="quantity" min="1" required>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="sale_apiary" name="apiary" value="Solberg" maxlength="50" required>
+                            </div>
+                            <div class="col-md-4 lamb-field d-none">
+                                <label for="sale_kg" class="form-label">Weight (kg) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="sale_kg" name="kg" step="0.01" min="0.01" disabled required>
+                            </div>
+                            <div class="col-md-4 lamb-field d-none">
+                                <label for="sale_price_per_kg" class="form-label">Price per kg (kr) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="sale_price_per_kg" name="price_per_kg" step="0.01" min="0" disabled required>
+                            </div>
+                            <div class="col-md-4 lamb-field d-none">
+                                <label for="sale_lamb_total" class="form-label">Total (kr)</label>
+                                <input type="text" class="form-control" id="sale_lamb_total" readonly disabled tabindex="-1">
                             </div>
                             <div class="col-md-6">
                                 <label for="sale_category_id" class="form-label">Category <span class="text-danger">*</span></label>
@@ -312,19 +324,19 @@
                                 <label for="edit_sale_product_id" class="form-label">Product <span class="text-danger">*</span></label>
                                 <select class="form-select" id="edit_sale_product_id" name="product_id" required>
                                     {% for p in products %}
-                                    <option value="{{ p.id }}">{{ p.name }}</option>
+                                    <option value="{{ p.id }}"{% if p.name == 'lammkött' %} data-lamb="1"{% endif %}>{{ p.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="edit_sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="edit_sale_skord" name="skord" maxlength="20" required>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="edit_sale_burk_kg" class="form-label">Burk (kg)</label>
                                 <input type="number" class="form-control" id="edit_sale_burk_kg" name="burk_kg" step="0.01" min="0">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="edit_sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
                                 <select class="form-select" id="edit_sale_consistency" name="consistency">
                                     <option value="fast">fast</option>
@@ -332,17 +344,29 @@
                                     <option value="fryst">fryst</option>
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="edit_sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="edit_sale_unit_price" name="unit_price" step="0.01" min="0" required>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="edit_sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="edit_sale_quantity" name="quantity" min="1" required>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 honey-field">
                                 <label for="edit_sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="edit_sale_apiary" name="apiary" maxlength="50" required>
+                            </div>
+                            <div class="col-md-4 lamb-field d-none">
+                                <label for="edit_sale_kg" class="form-label">Weight (kg) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit_sale_kg" name="kg" step="0.01" min="0.01" disabled required>
+                            </div>
+                            <div class="col-md-4 lamb-field d-none">
+                                <label for="edit_sale_price_per_kg" class="form-label">Price per kg (kr) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="edit_sale_price_per_kg" name="price_per_kg" step="0.01" min="0" disabled required>
+                            </div>
+                            <div class="col-md-4 lamb-field d-none">
+                                <label for="edit_sale_lamb_total" class="form-label">Total (kr)</label>
+                                <input type="text" class="form-control" id="edit_sale_lamb_total" readonly disabled tabindex="-1">
                             </div>
                             <div class="col-md-6">
                                 <label for="edit_sale_category_id" class="form-label">Category <span class="text-danger">*</span></label>
@@ -382,6 +406,34 @@
             return { id: c.id, name: c.name, email: c.email, search: (c.name + ' ' + (c.email || '')).toLowerCase() };
         });
 
+        // Lammkött is entered as weight and price per kg: the honey-only fields are hidden (and disabled, so
+        // they are neither validated nor sent) and the kg fields take their place.
+        function setLambMode(prefix) {
+            var select = document.getElementById(prefix + 'product_id');
+            var form = select.closest('form');
+            var lamb = !!(select.selectedOptions[0] && select.selectedOptions[0].dataset.lamb === '1');
+            form.querySelectorAll('.honey-field').forEach(function(el) {
+                el.classList.toggle('d-none', lamb);
+                el.querySelectorAll('input, select').forEach(function(i) { i.disabled = lamb; });
+            });
+            form.querySelectorAll('.lamb-field').forEach(function(el) {
+                el.classList.toggle('d-none', !lamb);
+                el.querySelectorAll('input[name]').forEach(function(i) { i.disabled = !lamb; });
+            });
+            updateLambTotal(prefix);
+        }
+        function updateLambTotal(prefix) {
+            var kg = parseFloat(document.getElementById(prefix + 'kg').value);
+            var price = parseFloat(document.getElementById(prefix + 'price_per_kg').value);
+            document.getElementById(prefix + 'lamb_total').value = (kg > 0 && price >= 0) ? (kg * price).toFixed(2) : '';
+        }
+        ['sale_', 'edit_sale_'].forEach(function(prefix) {
+            document.getElementById(prefix + 'product_id').addEventListener('change', function() { setLambMode(prefix); });
+            ['kg', 'price_per_kg'].forEach(function(f) {
+                document.getElementById(prefix + f).addEventListener('input', function() { updateLambTotal(prefix); });
+            });
+        });
+
         document.getElementById('saleCreateModal').addEventListener('show.bs.modal', function () {
             var dateEl = document.getElementById('sale_timestamp');
             if (dateEl && !dateEl.value) {
@@ -395,6 +447,7 @@
             if (h) { h.classList.add('invisible'); h.textContent = ''; }
             currentMatches = [];
             highlightedIndex = -1;
+            setLambMode('sale_');
         });
 
         var nameEl = document.getElementById('sale_customer_name');
@@ -562,6 +615,10 @@
             document.getElementById('edit_sale_customer_name').value = row.dataset.saleCustomerName || '';
             document.getElementById('edit_sale_customer_suggestions').classList.add('d-none');
             document.getElementById('edit_sale_customer_normalized_hint').classList.add('d-none');
+            var burk = parseFloat(row.dataset.saleBurkKg), unit = parseFloat(row.dataset.saleUnitPrice);
+            document.getElementById('edit_sale_kg').value = burk > 0 ? burk : '';
+            document.getElementById('edit_sale_price_per_kg').value = burk > 0 ? (unit / burk).toFixed(2) : '';
+            setLambMode('edit_sale_');
             editForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/edit';
             deleteForm.action = window.location.origin + '/sales/' + currentEditSaleId + '/delete';
             var modal = new bootstrap.Modal(editModal);

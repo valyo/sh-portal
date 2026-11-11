@@ -301,6 +301,11 @@ class Sale(db.Model):
         return round(self.unit_price * self.quantity, 2)
 
     @property
+    def from_invoice(self):
+        """True for sales created from an andel or lammandel invoice (those are not edited by hand)."""
+        return self.invoice_id is not None or self.lamm_invoice_id is not None
+
+    @property
     def display_customer(self):
         """Customer for display: linked Customer name or free-text customer_name."""
         if self.customer_id and self.customer:
