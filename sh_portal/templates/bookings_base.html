@@ -163,7 +163,7 @@
                                                 <th>Quantity</th>
                                                 <th>Status</th>
                                                 <th>Payment</th>
-                                                <th>{% if page_title == 'Lammandel' %}Welcome sent{% else %}Cert. sent{% endif %}</th>
+                                                {% if page_title != 'Lammandel' %}<th>Cert. sent</th>{% endif %}
                                                 <th>Delivered</th>
                                                 <th>Actions</th>
                                             </tr>
@@ -197,6 +197,7 @@
                                                         <span class="badge bg-secondary">N/A</span>
                                                     {% endif %}
                                                 </td>
+                                                {% if page_title != 'Lammandel' %}
                                                 <td>
                                                     {% if booking.certificate_sent_at %}
                                                         <span class="badge bg-info text-dark" title="{{ booking.certificate_sent_at.strftime('%Y-%m-%d %H:%M') }}">Yes</span>
@@ -204,6 +205,7 @@
                                                         <span class="badge bg-light text-muted border">No</span>
                                                     {% endif %}
                                                 </td>
+                                                {% endif %}
                                                 <td>
                                                     {% if booking.delivered_at %}
                                                         <span class="badge bg-success" title="{{ booking.delivered_at.strftime('%Y-%m-%d %H:%M') }}">Yes</span>
@@ -265,6 +267,18 @@
                                                         data-date-paid="{{ invoice.date_payed.strftime('%Y-%m-%d') if invoice.date_payed else '' }}">
                                                     <i class="bi bi-gear"></i> Manage
                                                 </button>
+                                                {% if page_title == 'Lammandel' %}
+                                                    {% if invoice.sale %}
+                                                        <span class="badge bg-success ms-1" title="Sale #{{ invoice.sale.id }}">Sale created</span>
+                                                    {% else %}
+                                                        <button type="button" class="btn btn-sm btn-outline-success ms-1 create-sale-btn"
+                                                                data-invoice-id="{{ invoice.id }}"
+                                                                data-invoice-number="{{ invoice.invoice_id }}"
+                                                                {% if not invoice.date_payed %}disabled title="Only a paid invoice can become a sale"{% endif %}>
+                                                            <i class="bi bi-cash-coin"></i> Create sale
+                                                        </button>
+                                                    {% endif %}
+                                                {% endif %}
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -977,6 +991,30 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error:', error);
             showNotification('Error updating invoice', true);
+        });
+    });
+
+    // Lammandel: turn a paid invoice into a sale (product lammkött, category lammandel)
+    document.querySelectorAll('.create-sale-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const number = this.dataset.invoiceNumber;
+            if (!confirm(`Create a sale from invoice ${number}?`)) return;
+            this.disabled = true;
+            fetch(`/lammandel/api/invoice/${this.dataset.invoiceId}/sale`, {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        reloadWithSeason('invoices');
+                    } else {
+                        btn.disabled = false;
+                        showNotification('Error: ' + (data.error || 'Failed to create sale'), true);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    btn.disabled = false;
+                    showNotification('Error creating sale', true);
+                });
         });
     });
 
