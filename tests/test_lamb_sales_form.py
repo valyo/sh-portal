@@ -1,4 +1,4 @@
-"""Selling lammkött by hand: only weight and price per kg are entered (plus date, category, customer)."""
+"""Selling lammkött (weight and price per kg) and lammskinn (quantity and price) by hand: no honey fields."""
 import pytest
 
 from sh_portal import db
@@ -23,6 +23,23 @@ def _sales(app):
 
 def _lamb_form(lamb, category, **kw):
     data = {"timestamp": "2026-10-20", "product_id": lamb.id, "category_id": category.id, "kg": "2.4", "price_per_kg": "250"}
+    data.update(kw)
+    return {k: v for k, v in data.items() if v is not None}
+
+
+@pytest.fixture
+def skin(app):
+    from sh_portal.models import Product
+    with app.app_context():
+        p = Product(name="lammskinn")
+        db.session.add(p)
+        db.session.commit()
+        db.session.refresh(p)
+        yield p
+
+
+def _skin_form(skin, category, **kw):
+    data = {"timestamp": "2026-10-20", "product_id": skin.id, "category_id": category.id, "quantity": "3", "unit_price": "400"}
     data.update(kw)
     return {k: v for k, v in data.items() if v is not None}
 
@@ -115,14 +132,20 @@ class TestEdit:
 class TestForm:
     def test_the_lamb_product_is_marked_and_the_kg_fields_exist(self, logged_in_client, lamb, product):
         html = logged_in_client.get("/sales").get_data(as_text=True)
-        assert f'<option value="{lamb.id}" data-lamb="1">lammkött</option>' in html
+        assert f'<option value="{lamb.id}" data-kind="meat">lammkött</option>' in html
         assert f'<option value="{product.id}">solberg honung</option>' in html
         for field in ('name="kg"', 'name="price_per_kg"'):
             assert html.count(field) == 2  # new and edit form
 
-    def test_honey_fields_are_marked_so_they_can_be_hidden(self, logged_in_client):
+    def test_the_skin_product_is_marked(self, logged_in_client, skin):
         html = logged_in_client.get("/sales").get_data(as_text=True)
-        assert html.count('class="col-md-4 honey-field"') == 12  # six per form
+        assert f'<option value="{skin.id}" data-kind="skin">lammskinn</option>' in html
+
+    def test_fields_say_which_products_they_are_for(self, logged_in_client):
+        html = logged_in_client.get("/sales").get_data(as_text=True)
+        assert html.count('data-kinds="honey"') == 8  # skörd, jar, consistency, apiary in the new and edit forms
+        assert html.count('data-kinds="honey skin"') == 4  # unit price and quantity
+        assert html.count('data-kinds="meat"') == 6  # weight, price per kg, total
 
     def test_lammandel_invoice_sales_have_no_edit_button(self, logged_in_client, app, lamb, sale_category, lamm_invoice):
         from sh_portal.models import Sale
@@ -131,3 +154,34 @@ class TestForm:
         db.session.commit()
         html = logged_in_client.get("/sales?list=1").get_data(as_text=True)
         assert "sale-edit-btn" not in html.split("<script")[0].split("<tbody>")[-1]
+
+
+class TestSkin:
+    def test_quantity_and_price_make_one_sale(self, logged_in_client, app, skin, sale_category, customer):
+        rv = logged_in_client.post("/sales/create", data=_skin_form(skin, sale_category, customer_id=customer.id), follow_redirects=True)
+        assert rv.status_code == 200
+        [s] = _sales(app)
+        assert (s.quantity, s.unit_price, s.skord, s.burk_kg) == (3, 400.0, "2026", None)
+        assert (s.consistency, s.apiary) == (None, None)
+        assert s.total_price == 1200.0 and s.customer_id == customer.id
+
+    def test_a_typed_customer_name_creates_the_customer(self, logged_in_client, app, skin, sale_category):
+        from sh_portal.models import Customer
+        logged_in_client.post("/sales/create", data=_skin_form(skin, sale_category, customer_name="skin buyer"))
+        with app.app_context():
+            assert [c.name for c in Customer.query.all()] == ["Skin Buyer"]
+
+    @pytest.mark.parametrize("override", [
+        {"quantity": None}, {"quantity": "0"}, {"unit_price": None}, {"unit_price": "-1"},
+        {"timestamp": ""}, {"timestamp": "x"}, {"category_id": None},
+    ])
+    def test_bad_input_creates_nothing(self, logged_in_client, app, skin, sale_category, override):
+        rv = logged_in_client.post("/sales/create", data=_skin_form(skin, sale_category, **override), follow_redirects=True)
+        assert rv.status_code == 200 and _sales(app) == []
+
+    def test_editing(self, logged_in_client, app, skin, sale_category):
+        logged_in_client.post("/sales/create", data=_skin_form(skin, sale_category))
+        sale_id = _sales(app)[0].id
+        logged_in_client.post(f"/sales/{sale_id}/edit", data=_skin_form(skin, sale_category, quantity="5", unit_price="350", timestamp="2027-02-01"))
+        [s] = _sales(app)
+        assert (s.quantity, s.unit_price, s.skord, s.consistency, s.apiary) == (5, 350.0, "2027", None, None)

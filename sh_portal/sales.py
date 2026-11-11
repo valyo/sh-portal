@@ -30,12 +30,41 @@ def _get_sqlite_db_path():
 
 sales_bp = Blueprint('sales', __name__)
 
-LAMB_PRODUCT = 'lammkött'
+LAMB_MEAT = 'lammkött'
+LAMB_SKIN = 'lammskinn'
 
 
-def _is_lamb(product_id):
+def _product_kind(product_id):
+    """'meat' (weight and price per kg), 'skin' (quantity and price) or 'honey' (everything else).
+
+    The kind decides which fields a sale form needs; keep in step with data-kind in sales.html.
+    """
     product = db.session.get(Product, product_id) if product_id else None
-    return product is not None and product.name == LAMB_PRODUCT
+    return {LAMB_MEAT: 'meat', LAMB_SKIN: 'skin'}.get(product.name if product else None, 'honey')
+
+
+def _skin_sale_values(date_str, unit_price, quantity, category_id):
+    """(errors, values) for a lammskinn sale: quantity and price, no honey fields.
+
+    Skörd is the year of the sale; consistency and apiary are honey-only and stay empty.
+    """
+    errors = []
+    if not date_str:
+        errors.append('Date is required.')
+    if unit_price is None or unit_price < 0:
+        errors.append('Price is required.')
+    if quantity is None or quantity < 1:
+        errors.append('Quantity must be at least 1.')
+    if not category_id:
+        errors.append('Category is required.')
+    if errors:
+        return errors, None
+    try:
+        year = datetime.strptime(date_str, '%Y-%m-%d').year
+    except ValueError:
+        return ['Invalid date format.'], None
+    return [], dict(skord=str(year), burk_kg=None, unit_price=unit_price, quantity=quantity,
+                    consistency=null(), apiary=null())
 
 
 def _lamb_sale_values(date_str, category_id):
@@ -181,13 +210,7 @@ def create_sale():
     date_str = request.form.get('timestamp')
     product_id = request.form.get('product_id', type=int)
     category_id = request.form.get('category_id', type=int)
-    if _is_lamb(product_id):
-        errors, values = _lamb_sale_values(date_str, category_id)
-    else:
-        (_, _, skord, burk_kg, unit_price, quantity, consistency, apiary, _) = _sale_form_data(request)
-        errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
-        values = dict(skord=skord, burk_kg=burk_kg, unit_price=unit_price, quantity=quantity,
-                      consistency=consistency, apiary=apiary)
+    errors, values = _sale_values(date_str, product_id, category_id)
     if errors:
         for msg in errors:
             flash(msg, 'error')
@@ -236,6 +259,19 @@ def _sale_form_data(request):
     return (date_str, product_id, skord, burk_kg, unit_price, quantity, consistency, apiary, category_id)
 
 
+def _sale_values(date_str, product_id, category_id):
+    """(errors, values) for the sale form, by what the product needs (see _product_kind)."""
+    kind = _product_kind(product_id)
+    if kind == 'meat':
+        return _lamb_sale_values(date_str, category_id)
+    (_, _, skord, burk_kg, unit_price, quantity, consistency, apiary, _) = _sale_form_data(request)
+    if kind == 'skin':
+        return _skin_sale_values(date_str, unit_price, quantity, category_id)
+    errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
+    return errors, dict(skord=skord, burk_kg=burk_kg, unit_price=unit_price, quantity=quantity,
+                        consistency=consistency, apiary=apiary)
+
+
 def _resolve_customer_from_form():
     """The sale form's customer: a picked customer_id, or a typed name for a new (name-only) one."""
     return resolve_sale_customer(
@@ -279,13 +315,10 @@ def edit_sale(sale_id):
         return redirect(url_for('sales.list_sales'))
 
     # Update from form
-    (date_str, product_id, skord, burk_kg, unit_price, quantity, consistency, apiary, category_id) = _sale_form_data(request)
-    if _is_lamb(product_id):
-        errors, values = _lamb_sale_values(date_str, category_id)
-    else:
-        errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
-        values = dict(skord=skord, burk_kg=burk_kg, unit_price=unit_price, quantity=quantity,
-                      consistency=consistency, apiary=apiary)
+    date_str = request.form.get('timestamp')
+    product_id = request.form.get('product_id', type=int)
+    category_id = request.form.get('category_id', type=int)
+    errors, values = _sale_values(date_str, product_id, category_id)
     if errors:
         for msg in errors:
             flash(msg, 'error')

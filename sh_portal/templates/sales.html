@@ -232,20 +232,20 @@
                                 <select class="form-select" id="sale_product_id" name="product_id" required>
                                     <option value="">— Select —</option>
                                     {% for p in products %}
-                                    <option value="{{ p.id }}"{% if p.name == 'lammkött' %} data-lamb="1"{% endif %}>{{ p.name }}</option>
+                                    <option value="{{ p.id }}"{% if p.name == 'lammkött' %} data-kind="meat"{% elif p.name == 'lammskinn' %} data-kind="skin"{% endif %}>{{ p.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="sale_skord" name="skord" placeholder="e.g. 2024 or okänd" maxlength="20" required>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="sale_burk_kg" class="form-label">Burk (kg)</label>
                                 <input type="number" class="form-control" id="sale_burk_kg" name="burk_kg" placeholder="e.g. 2.5" step="0.01" min="0">
                                 <small class="text-muted">Jar size in kg. Leave empty if not applicable.</small>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
                                 <select class="form-select" id="sale_consistency" name="consistency">
                                     <option value="fast">fast</option>
@@ -253,27 +253,27 @@
                                     <option value="fryst">fryst</option>
                                 </select>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey skin">
                                 <label for="sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="sale_unit_price" name="unit_price" step="0.01" min="0" required>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey skin">
                                 <label for="sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="sale_quantity" name="quantity" min="1" required>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="sale_apiary" name="apiary" value="Solberg" maxlength="50" required>
                             </div>
-                            <div class="col-md-4 lamb-field d-none">
+                            <div class="col-md-4 kind-field d-none" data-kinds="meat">
                                 <label for="sale_kg" class="form-label">Weight (kg) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="sale_kg" name="kg" step="0.01" min="0.01" disabled required>
                             </div>
-                            <div class="col-md-4 lamb-field d-none">
+                            <div class="col-md-4 kind-field d-none" data-kinds="meat">
                                 <label for="sale_price_per_kg" class="form-label">Price per kg (kr) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="sale_price_per_kg" name="price_per_kg" step="0.01" min="0" disabled required>
                             </div>
-                            <div class="col-md-4 lamb-field d-none">
+                            <div class="col-md-4 kind-field d-none" data-kinds="meat">
                                 <label for="sale_lamb_total" class="form-label">Total (kr)</label>
                                 <input type="text" class="form-control" id="sale_lamb_total" readonly disabled tabindex="-1">
                             </div>
@@ -324,19 +324,19 @@
                                 <label for="edit_sale_product_id" class="form-label">Product <span class="text-danger">*</span></label>
                                 <select class="form-select" id="edit_sale_product_id" name="product_id" required>
                                     {% for p in products %}
-                                    <option value="{{ p.id }}"{% if p.name == 'lammkött' %} data-lamb="1"{% endif %}>{{ p.name }}</option>
+                                    <option value="{{ p.id }}"{% if p.name == 'lammkött' %} data-kind="meat"{% elif p.name == 'lammskinn' %} data-kind="skin"{% endif %}>{{ p.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="edit_sale_skord" class="form-label">Skörd <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="edit_sale_skord" name="skord" maxlength="20" required>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="edit_sale_burk_kg" class="form-label">Burk (kg)</label>
                                 <input type="number" class="form-control" id="edit_sale_burk_kg" name="burk_kg" step="0.01" min="0">
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="edit_sale_consistency" class="form-label">Consistency <span class="text-danger">*</span></label>
                                 <select class="form-select" id="edit_sale_consistency" name="consistency">
                                     <option value="fast">fast</option>
@@ -344,27 +344,27 @@
                                     <option value="fryst">fryst</option>
                                 </select>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey skin">
                                 <label for="edit_sale_unit_price" class="form-label">Unit price (kr) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="edit_sale_unit_price" name="unit_price" step="0.01" min="0" required>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey skin">
                                 <label for="edit_sale_quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="edit_sale_quantity" name="quantity" min="1" required>
                             </div>
-                            <div class="col-md-4 honey-field">
+                            <div class="col-md-4 kind-field" data-kinds="honey">
                                 <label for="edit_sale_apiary" class="form-label">Apiary <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="edit_sale_apiary" name="apiary" maxlength="50" required>
                             </div>
-                            <div class="col-md-4 lamb-field d-none">
+                            <div class="col-md-4 kind-field d-none" data-kinds="meat">
                                 <label for="edit_sale_kg" class="form-label">Weight (kg) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="edit_sale_kg" name="kg" step="0.01" min="0.01" disabled required>
                             </div>
-                            <div class="col-md-4 lamb-field d-none">
+                            <div class="col-md-4 kind-field d-none" data-kinds="meat">
                                 <label for="edit_sale_price_per_kg" class="form-label">Price per kg (kr) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="edit_sale_price_per_kg" name="price_per_kg" step="0.01" min="0" disabled required>
                             </div>
-                            <div class="col-md-4 lamb-field d-none">
+                            <div class="col-md-4 kind-field d-none" data-kinds="meat">
                                 <label for="edit_sale_lamb_total" class="form-label">Total (kr)</label>
                                 <input type="text" class="form-control" id="edit_sale_lamb_total" readonly disabled tabindex="-1">
                             </div>
@@ -406,19 +406,17 @@
             return { id: c.id, name: c.name, email: c.email, search: (c.name + ' ' + (c.email || '')).toLowerCase() };
         });
 
-        // Lammkött is entered as weight and price per kg: the honey-only fields are hidden (and disabled, so
-        // they are neither validated nor sent) and the kg fields take their place.
+        // What a sale form asks for depends on the product (data-kind on its option): honey (the default)
+        // needs everything, lammskinn only quantity and price, lammkött weight and price per kg. Fields of
+        // the other kinds are hidden and disabled, so they are neither validated nor sent.
         function setLambMode(prefix) {
             var select = document.getElementById(prefix + 'product_id');
             var form = select.closest('form');
-            var lamb = !!(select.selectedOptions[0] && select.selectedOptions[0].dataset.lamb === '1');
-            form.querySelectorAll('.honey-field').forEach(function(el) {
-                el.classList.toggle('d-none', lamb);
-                el.querySelectorAll('input, select').forEach(function(i) { i.disabled = lamb; });
-            });
-            form.querySelectorAll('.lamb-field').forEach(function(el) {
-                el.classList.toggle('d-none', !lamb);
-                el.querySelectorAll('input[name]').forEach(function(i) { i.disabled = !lamb; });
+            var kind = (select.selectedOptions[0] && select.selectedOptions[0].dataset.kind) || 'honey';
+            form.querySelectorAll('.kind-field').forEach(function(el) {
+                var show = el.dataset.kinds.split(' ').indexOf(kind) !== -1;
+                el.classList.toggle('d-none', !show);
+                el.querySelectorAll('input[name], select[name]').forEach(function(i) { i.disabled = !show; });
             });
             updateLambTotal(prefix);
         }
