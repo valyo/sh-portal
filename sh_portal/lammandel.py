@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, current_app, jsonify, send_file, abort
-from .models import Season, BookingsLamm, InvoiceLamm
+from .models import Season, BookingsLamm, InvoiceLamm, Sale, Product, SaleCategory
 from . import db
 import re
 import os
@@ -12,6 +12,7 @@ from .utils import (
 import json
 from datetime import datetime, timedelta
 from flask_mail import Message
+from sqlalchemy import null
 
 lammandel = Blueprint('lammandel', __name__)
 
@@ -368,6 +369,63 @@ def send_invoices():
         current_app.logger.error(error_msg)
         return jsonify({'error': error_msg}), 500
 
+def create_sale_from_lamm_invoice(invoice):
+    """Create the sale for a paid lammandel invoice: product "lammkött", category "lammandel".
+
+    Unlike andel invoices this is not automatic; the user picks which invoices become sales. The
+    unit price is the invoice total per share, the date is the payment date and the honey fields
+    (jar size, consistency, apiary) stay empty. Returns the new sale, or None if the product or
+    category is missing.
+    """
+    product = Product.query.filter_by(name='lammkött').first()
+    category = SaleCategory.query.filter_by(name='lammandel').first()
+    if not product or not category:
+        current_app.logger.warning('Cannot create sale from lammandel invoice: missing Product "lammkött" or SaleCategory "lammandel".')
+        return None
+    sale = Sale(
+        timestamp=invoice.date_payed,
+        product_id=product.id,
+        skord=str(invoice.season.year),
+        burk_kg=None,
+        unit_price=round(invoice.tot_sum / invoice.quantity, 2) if invoice.quantity else 0,
+        quantity=invoice.quantity,
+        consistency=null(),  # a plain None would get the column's honey default
+        apiary=null(),
+        category_id=category.id,
+        customer_id=invoice.booking.customer_id,
+        lamm_invoice_id=invoice.id,
+    )
+    db.session.add(sale)
+    return sale
+
+
+@lammandel.route('/lammandel/api/invoice/<int:invoice_id>/sale', methods=['POST'])
+def create_invoice_sale(invoice_id):
+    if not session.get('user'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    invoice = db.session.get(InvoiceLamm, invoice_id)
+    if invoice is None:
+        abort(404)
+    if invoice.date_payed is None:
+        return jsonify({'success': False, 'error': 'Only a paid invoice can become a sale'}), 400
+    if invoice.sale is not None:
+        return jsonify({'success': False, 'error': f'Invoice {invoice.invoice_id} already has a sale'}), 409
+
+    try:
+        sale = create_sale_from_lamm_invoice(invoice)
+        if sale is None:
+            return jsonify({'success': False, 'error': 'The "lammkött" product or the "lammandel" category is missing'}), 500
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error creating sale from invoice {invoice.invoice_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    flash(f'Sale created from invoice {invoice.invoice_id}.', 'success')
+    return jsonify({'success': True, 'message': f'Sale created from invoice {invoice.invoice_id}', 'sale_id': sale.id})
+
+
 @lammandel.route('/lammandel/api/invoice/<int:invoice_id>/payment', methods=['POST'])
 def update_invoice_payment(invoice_id):
     if not session.get('user'):
@@ -381,8 +439,14 @@ def update_invoice_payment(invoice_id):
     try:
         if date_paid:
             invoice.date_payed = datetime.strptime(date_paid, '%Y-%m-%d')
+            # A sale made from this invoice follows the payment date.
+            if invoice.sale is not None:
+                invoice.sale.timestamp = invoice.date_payed
         else:
             invoice.date_payed = None
+            # An unpaid invoice cannot be a sale.
+            if invoice.sale is not None:
+                db.session.delete(invoice.sale)
 
         db.session.commit()
         flash('Invoice updated.', 'success')
@@ -405,6 +469,8 @@ def delete_invoice(invoice_id):
     number = invoice.invoice_id
 
     try:
+        for sale in Sale.query.filter_by(lamm_invoice_id=invoice.id).all():
+            db.session.delete(sale)
         db.session.delete(invoice)
         db.session.commit()
     except Exception as e:
