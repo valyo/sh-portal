@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, abort
 from sqlalchemy import func
-from .models import Customer, Bookings, BookingsLamm, Invoice, Sale, SaleCategory, Season
+from .models import Customer, Bookings, BookingsLamm, Invoice, InvoiceLamm, Sale, SaleCategory, Season
 from .utils import clean_optional, CUSTOMER_DETAIL_FIELDS, CUSTOMER_NAME_MAX
 from . import db
 
@@ -20,12 +20,15 @@ def list_customers():
 def _shares_by_season(customer):
     """[{'year', 'type'}] for the customer card, by the same rule as the table's counts.
 
-    One entry per Andelsbiodling share: every "andel" sale, plus each booking that is not
-    already one of those sales (see _activity_counts). Lammandel has no sales, so those are
-    its bookings. A share that is only a booking has not been paid (paying the invoice creates its
-    sale), so it is flagged `paid: False`.
+    One entry per share: every "andel" sale, plus each Andelsbiodling booking that is not already
+    one of those sales (see _activity_counts); likewise every "lammandel" sale plus each Lammandel
+    booking that is not one. An Andelsbiodling share that is only a booking has not been paid
+    (paying the invoice creates its sale), so it is flagged `paid: False`.
     """
-    andel_sales = [s for s in customer.sales if s.category and s.category.name == 'andel']
+    def sales_in(category):
+        return [s for s in customer.sales if s.category and s.category.name == category]
+
+    andel_sales = sales_in('andel')
     sale_years = {s.skord for s in andel_sales}
     invoiced = {s.invoice.booking_id for s in andel_sales if s.invoice}
     shares = [{'year': s.skord, 'type': 'andelsbiodling', 'paid': True} for s in andel_sales]
@@ -34,7 +37,16 @@ def _shares_by_season(customer):
         for b in customer.bookings
         if b.id not in invoiced and b.season.year not in sale_years
     ]
-    shares += [{'year': b.season.year, 'type': 'lammandel'} for b in customer.bookings_lamm]
+
+    lamm_sales = sales_in('lammandel')
+    lamm_years = {s.skord for s in lamm_sales}
+    lamm_invoiced = {s.lamm_invoice.booking_id for s in lamm_sales if s.lamm_invoice}
+    shares += [{'year': s.skord, 'type': 'lammandel'} for s in lamm_sales]
+    shares += [
+        {'year': b.season.year, 'type': 'lammandel'}
+        for b in customer.bookings_lamm
+        if b.id not in lamm_invoiced and b.season.year not in lamm_years
+    ]
     shares.sort(key=lambda x: (-int(x['year']) if x['year'].isdigit() else 1, x['type']))
     return shares
 
@@ -49,20 +61,23 @@ def _activity_counts():
     harvest year (older shares were imported as sales while the booking was entered separately).
     A booking with neither counts as one share, and as an unpaid one (`unpaid` is how many of
     the `honey` shares are such bookings).
+
+    Lammandel works the same way with the "lammandel" category: those sales and the bookings that
+    are not already one of them are the `lamb` count.
     """
     counts = {}
 
     def bump(customer_id, key, n):
         counts.setdefault(customer_id, {'honey': 0, 'unpaid': 0, 'lamb': 0, 'sales': 0})[key] += n
 
-    is_andel = SaleCategory.name == 'andel'
-    for customer_id, is_andel_sale, n in (
-        db.session.query(Sale.customer_id, is_andel, func.count(Sale.id))
+    bucket = {'andel': 'honey', 'lammandel': 'lamb'}
+    for customer_id, category, n in (
+        db.session.query(Sale.customer_id, SaleCategory.name, func.count(Sale.id))
         .join(SaleCategory, Sale.category_id == SaleCategory.id)
         .filter(Sale.customer_id.isnot(None))
-        .group_by(Sale.customer_id, is_andel)
+        .group_by(Sale.customer_id, SaleCategory.name)
     ):
-        bump(customer_id, 'honey' if is_andel_sale else 'sales', n)
+        bump(customer_id, bucket.get(category, 'sales'), n)
 
     from_invoice = (
         db.session.query(Sale.id)
@@ -87,8 +102,24 @@ def _activity_counts():
         bump(customer_id, 'honey', n)
         bump(customer_id, 'unpaid', n)
 
+    lamm_from_invoice = (
+        db.session.query(Sale.id)
+        .join(InvoiceLamm, Sale.lamm_invoice_id == InvoiceLamm.id)
+        .filter(InvoiceLamm.booking_id == BookingsLamm.id)
+        .exists()
+    )
+    lamm_same_season = (
+        db.session.query(Sale.id)
+        .join(SaleCategory, Sale.category_id == SaleCategory.id)
+        .filter(SaleCategory.name == 'lammandel',
+                Sale.customer_id == BookingsLamm.customer_id,
+                Sale.skord == Season.year)
+        .exists()
+    )
     for customer_id, n in (
         db.session.query(BookingsLamm.customer_id, func.count(BookingsLamm.id))
+        .join(Season, BookingsLamm.season_id == Season.id)
+        .filter(~lamm_from_invoice, ~lamm_same_season)
         .group_by(BookingsLamm.customer_id)
     ):
         bump(customer_id, 'lamb', n)

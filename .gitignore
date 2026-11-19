@@ -54,3 +54,17 @@ sh-*.json
 # Other
 certificate_preview.pdf
 invoices/
+
+# Service account key and local-only files
+service-account.json
+certificates/
+temp/
+core
+
+# One-off data clean-up scripts and exports
+check_names.py
+compare_names.py
+fix_customer_names.py
+rename.py
+names.txt
+totalt_försäljning*.csv

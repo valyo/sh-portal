@@ -12,7 +12,7 @@ from flask import Blueprint, current_app, render_template, redirect, url_for, se
 from .models import Sale, SaleCategory, Product, Customer
 from .utils import resolve_sale_customer
 from . import db
-from sqlalchemy import func
+from sqlalchemy import func, null
 
 
 def _get_sqlite_db_path():
@@ -29,6 +29,70 @@ def _get_sqlite_db_path():
     return os.path.abspath(path)
 
 sales_bp = Blueprint('sales', __name__)
+
+LAMB_MEAT = 'lammkött'
+LAMB_SKIN = 'lammskinn'
+
+
+def _product_kind(product_id):
+    """'meat' (weight and price per kg), 'skin' (quantity and price) or 'honey' (everything else).
+
+    The kind decides which fields a sale form needs; keep in step with data-kind in sales.html.
+    """
+    product = db.session.get(Product, product_id) if product_id else None
+    return {LAMB_MEAT: 'meat', LAMB_SKIN: 'skin'}.get(product.name if product else None, 'honey')
+
+
+def _skin_sale_values(date_str, unit_price, quantity, category_id):
+    """(errors, values) for a lammskinn sale: quantity and price, no honey fields.
+
+    Skörd is the year of the sale; consistency and apiary are honey-only and stay empty.
+    """
+    errors = []
+    if not date_str:
+        errors.append('Date is required.')
+    if unit_price is None or unit_price < 0:
+        errors.append('Price is required.')
+    if quantity is None or quantity < 1:
+        errors.append('Quantity must be at least 1.')
+    if not category_id:
+        errors.append('Category is required.')
+    if errors:
+        return errors, None
+    try:
+        year = datetime.strptime(date_str, '%Y-%m-%d').year
+    except ValueError:
+        return ['Invalid date format.'], None
+    return [], dict(skord=str(year), burk_kg=None, unit_price=unit_price, quantity=quantity,
+                    consistency=null(), apiary=null())
+
+
+def _lamb_sale_values(date_str, category_id):
+    """(errors, values) for a lammkött sale entered as kg and price per kg.
+
+    The sale is stored as quantity 1 with the weight in burk_kg and the total (kg x price per kg)
+    as the unit price, so unit_price x quantity stays the revenue. Skörd is the year of the sale;
+    consistency and apiary are honey-only and stay empty.
+    """
+    errors = []
+    kg = request.form.get('kg', type=float)
+    price_per_kg = request.form.get('price_per_kg', type=float)
+    if not date_str:
+        errors.append('Date is required.')
+    if kg is None or kg <= 0:
+        errors.append('Weight (kg) must be more than 0.')
+    if price_per_kg is None or price_per_kg < 0:
+        errors.append('Price per kg is required.')
+    if not category_id:
+        errors.append('Category is required.')
+    if errors:
+        return errors, None
+    try:
+        year = datetime.strptime(date_str, '%Y-%m-%d').year
+    except ValueError:
+        return ['Invalid date format.'], None
+    return [], dict(skord=str(year), burk_kg=kg, unit_price=round(kg * price_per_kg, 2), quantity=1,
+                    consistency=null(), apiary=null())
 
 
 def _build_sales_query(year=None, category_id=None, product_id=None, andel_only=False):
@@ -145,14 +209,8 @@ def create_sale():
 
     date_str = request.form.get('timestamp')
     product_id = request.form.get('product_id', type=int)
-    skord = (request.form.get('skord') or '').strip()
-    burk_kg = request.form.get('burk_kg', type=float)
-    unit_price = request.form.get('unit_price', type=float)
-    quantity = request.form.get('quantity', type=int)
-    consistency = (request.form.get('consistency') or 'fast').strip()
-    apiary = (request.form.get('apiary') or 'Solberg').strip()
     category_id = request.form.get('category_id', type=int)
-    errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
+    errors, values = _sale_values(date_str, product_id, category_id)
     if errors:
         for msg in errors:
             flash(msg, 'error')
@@ -173,16 +231,11 @@ def create_sale():
     sale = Sale(
         timestamp=ts,
         product_id=product_id,
-        skord=skord,
-        burk_kg=burk_kg,
-        unit_price=unit_price,
-        quantity=quantity,
-        consistency=consistency,
-        apiary=apiary,
         category_id=category_id,
         customer_id=customer.id if customer else None,
         customer_name=None,
         invoice_id=None,
+        **values,
     )
     db.session.add(sale)
     db.session.commit()
@@ -204,6 +257,19 @@ def _sale_form_data(request):
     apiary = (request.form.get('apiary') or 'Solberg').strip()
     category_id = request.form.get('category_id', type=int)
     return (date_str, product_id, skord, burk_kg, unit_price, quantity, consistency, apiary, category_id)
+
+
+def _sale_values(date_str, product_id, category_id):
+    """(errors, values) for the sale form, by what the product needs (see _product_kind)."""
+    kind = _product_kind(product_id)
+    if kind == 'meat':
+        return _lamb_sale_values(date_str, category_id)
+    (_, _, skord, burk_kg, unit_price, quantity, consistency, apiary, _) = _sale_form_data(request)
+    if kind == 'skin':
+        return _skin_sale_values(date_str, unit_price, quantity, category_id)
+    errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
+    return errors, dict(skord=skord, burk_kg=burk_kg, unit_price=unit_price, quantity=quantity,
+                        consistency=consistency, apiary=apiary)
 
 
 def _resolve_customer_from_form():
@@ -244,13 +310,15 @@ def edit_sale(sale_id):
     sale = db.session.get(Sale, sale_id)
     if sale is None:
         abort(404)
-    if sale.invoice_id is not None:
+    if sale.from_invoice:
         flash('Sales created from an invoice cannot be edited.', 'error')
         return redirect(url_for('sales.list_sales'))
 
     # Update from form
-    (date_str, product_id, skord, burk_kg, unit_price, quantity, consistency, apiary, category_id) = _sale_form_data(request)
-    errors = _validate_sale_form(date_str, product_id, skord, unit_price, quantity, consistency, apiary, category_id)
+    date_str = request.form.get('timestamp')
+    product_id = request.form.get('product_id', type=int)
+    category_id = request.form.get('category_id', type=int)
+    errors, values = _sale_values(date_str, product_id, category_id)
     if errors:
         for msg in errors:
             flash(msg, 'error')
@@ -269,12 +337,8 @@ def edit_sale(sale_id):
 
     sale.timestamp = ts
     sale.product_id = product_id
-    sale.skord = skord
-    sale.burk_kg = burk_kg
-    sale.unit_price = unit_price
-    sale.quantity = quantity
-    sale.consistency = consistency
-    sale.apiary = apiary
+    for field, value in values.items():
+        setattr(sale, field, value)
     sale.category_id = category_id
     sale.customer_id = customer.id if customer else None
     sale.customer_name = None

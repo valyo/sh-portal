@@ -284,12 +284,13 @@ class Sale(db.Model):
     burk_kg = db.Column(db.Float, nullable=True)  # jar size in kg (unit always kg)
     unit_price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
-    consistency = db.Column(db.String(20), nullable=False, default='fast')  # fast, flytande, fryst
-    apiary = db.Column(db.String(50), nullable=False, default='Solberg')
+    consistency = db.Column(db.String(20), nullable=True, default='fast')  # fast, flytande, fryst; empty for non-honey (lammkött)
+    apiary = db.Column(db.String(50), nullable=True, default='Solberg')  # empty for non-honey (lammkött)
     category_id = db.Column(db.Integer, db.ForeignKey('sale_categories.id'), nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)  # portal customer (andel)
     customer_name = db.Column(db.String(200), nullable=True)  # free-text when no customer_id
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True)  # set when created from paid andel invoice
+    lamm_invoice_id = db.Column(db.Integer, db.ForeignKey('invoices_lamm.id'), nullable=True)  # set when created from a paid lammandel invoice
 
     product = db.relationship('Product', backref=db.backref('sales', lazy=True))
     category = db.relationship('SaleCategory', backref=db.backref('sales', lazy=True))
@@ -298,6 +299,11 @@ class Sale(db.Model):
     @property
     def total_price(self):
         return round(self.unit_price * self.quantity, 2)
+
+    @property
+    def from_invoice(self):
+        """True for sales created from an andel or lammandel invoice (those are not edited by hand)."""
+        return self.invoice_id is not None or self.lamm_invoice_id is not None
 
     @property
     def display_customer(self):
@@ -327,6 +333,7 @@ class InvoiceLamm(VatMixin, db.Model):
     # Relationships
     season = db.relationship('Season', backref=db.backref('invoices_lamm', lazy=True))
     booking = db.relationship('BookingsLamm', backref=db.backref('invoices_lamm', lazy=True))
+    sale = db.relationship('Sale', foreign_keys='Sale.lamm_invoice_id', backref=db.backref('lamm_invoice'), uselist=False)
 
     @property
     def line_items(self):
