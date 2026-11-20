@@ -1,0 +1,6 @@
+# setuptools 70.3.0 is only pip's vendored pkg_resources (pip/_vendor/vendor.txt).
+# It is never imported by the app and the real setuptools is not installed in the image.
+# Remove these entries once the base image ships a pip that vendors a fixed setuptools.
+CVE-2025-47273
+CVE-2026-59890
+GHSA-xmj3-9gf7-h52w

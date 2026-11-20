@@ -1,0 +1,25 @@
+# VCS / CI
+.git
+.github
+.gitignore
+
+# Secrets and local data (mounted into the dev container via docker-compose)
+.env
+service-account.json
+instance/
+*.db
+
+# Generated documents (runtime data)
+invoices/
+certificates/
+temp/
+
+# Local environments and caches
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.idea/
+.vscode/
+.DS_Store
